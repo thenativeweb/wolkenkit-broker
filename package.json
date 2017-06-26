@@ -16,7 +16,6 @@
       "email": "christian.nolte@thenativeweb.io"
     }
   ],
-  "private": true,
   "dependencies": {
     "async": "2.4.1",
     "commands-events": "1.0.0",
