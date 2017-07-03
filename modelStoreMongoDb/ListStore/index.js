@@ -273,7 +273,11 @@ ListStore.prototype.read = function (options, callback) {
   let selector;
 
   if (options.query.where) {
-    selector = translate.selector(options.query.where);
+    try {
+      selector = translate.selector(options.query.where);
+    } catch (err) {
+      return process.nextTick(() => callback(err));
+    }
   }
 
   let cursor = this.collections[options.modelName].find(selector);
