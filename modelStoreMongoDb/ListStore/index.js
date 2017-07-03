@@ -210,8 +210,8 @@ ListStore.prototype.updated = function (options, callback) {
   try {
     payload = translate.payload(options.payload);
     selector = translate.selector(options.selector);
-  } catch (ex) {
-    return callback(ex);
+  } catch (err) {
+    return process.nextTick(() => callback(err));
   }
 
   this.collections[options.modelName].updateMany(selector, payload, err => {
@@ -240,8 +240,8 @@ ListStore.prototype.removed = function (options, callback) {
 
   try {
     selector = translate.selector(options.selector);
-  } catch (ex) {
-    return callback(ex);
+  } catch (err) {
+    return process.nextTick(() => callback(err));
   }
 
   this.collections[options.modelName].deleteMany(selector, err => {
