@@ -279,7 +279,11 @@ ListStore.prototype.read = function (options, callback) {
   let cursor = this.collections[options.modelName].find(selector);
 
   if (options.query.orderBy) {
-    cursor = cursor.sort(translate.orderBy(options.query.orderBy));
+    try {
+      cursor = cursor.sort(translate.orderBy(options.query.orderBy));
+    } catch (err) {
+      return process.nextTick(() => callback(err));
+    }
   } else {
     // If no query is given, MongoDB returns the result in an arbitrary (?)
     // order. To restore the natural order, sort by its internal key, which

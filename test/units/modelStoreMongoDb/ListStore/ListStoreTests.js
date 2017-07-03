@@ -116,4 +116,29 @@ suite('ListStore', () => {
       });
     });
   });
+
+  suite('read', () => {
+    test('returns an error if invalid orderBy criteria is given.', done => {
+      const listStore = new ListStore({ url, eventSequencer: new EventSequencer() }),
+            storeOptions = getStoreOptions();
+
+      listStore.initialize(storeOptions.initializeOptions, errInitialize => {
+        assert.that(errInitialize).is.null();
+
+        listStore.read({
+          modelName: storeOptions.modelName,
+          query: {
+            orderBy: {
+              timestamp: 'invalidOrderCriteria'
+            }
+          }
+        }, errRead => {
+          assert.that(errRead).is.not.null();
+          assert.that(errRead.message).is.equalTo('Invalid order criteria.');
+
+          done();
+        });
+      });
+    });
+  });
 });
