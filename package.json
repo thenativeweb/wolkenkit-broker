@@ -14,6 +14,10 @@
     {
       "name": "Christian Nolte",
       "email": "christian.nolte@thenativeweb.io"
+    },
+    {
+      "name": "Jan-Hendrik Grundhöfer",
+      "email": "jan-hendrik.grundhoefer@thenativeweb.io"
     }
   ],
   "dependencies": {
@@ -27,7 +31,7 @@
     "sparbuch": "1.0.0",
     "stack-trace": "0.0.10",
     "streamtoarray": "0.1.4",
-    "tailwind": "1.0.0",
+    "tailwind": "1.0.1",
     "uuidv4": "0.5.0",
     "wolkenkit-application": "1.0.0"
   },

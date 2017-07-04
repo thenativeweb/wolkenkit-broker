@@ -211,7 +211,7 @@ ListStore.prototype.updated = function (options, callback) {
     payload = translate.payload(options.payload);
     selector = translate.selector(options.selector);
   } catch (ex) {
-    return callback(ex);
+    return process.nextTick(() => callback(ex));
   }
 
   this.collections[options.modelName].updateMany(selector, payload, err => {
@@ -241,7 +241,7 @@ ListStore.prototype.removed = function (options, callback) {
   try {
     selector = translate.selector(options.selector);
   } catch (ex) {
-    return callback(ex);
+    return process.nextTick(() => callback(ex));
   }
 
   this.collections[options.modelName].deleteMany(selector, err => {
@@ -273,13 +273,21 @@ ListStore.prototype.read = function (options, callback) {
   let selector;
 
   if (options.query.where) {
-    selector = translate.selector(options.query.where);
+    try {
+      selector = translate.selector(options.query.where);
+    } catch (ex) {
+      return process.nextTick(() => callback(ex));
+    }
   }
 
   let cursor = this.collections[options.modelName].find(selector);
 
   if (options.query.orderBy) {
-    cursor = cursor.sort(translate.orderBy(options.query.orderBy));
+    try {
+      cursor = cursor.sort(translate.orderBy(options.query.orderBy));
+    } catch (ex) {
+      return process.nextTick(() => callback(ex));
+    }
   } else {
     // If no query is given, MongoDB returns the result in an arbitrary (?)
     // order. To restore the natural order, sort by its internal key, which
