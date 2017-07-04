@@ -210,8 +210,8 @@ ListStore.prototype.updated = function (options, callback) {
   try {
     payload = translate.payload(options.payload);
     selector = translate.selector(options.selector);
-  } catch (err) {
-    return process.nextTick(() => callback(err));
+  } catch (ex) {
+    return process.nextTick(() => callback(ex));
   }
 
   this.collections[options.modelName].updateMany(selector, payload, err => {
@@ -240,8 +240,8 @@ ListStore.prototype.removed = function (options, callback) {
 
   try {
     selector = translate.selector(options.selector);
-  } catch (err) {
-    return process.nextTick(() => callback(err));
+  } catch (ex) {
+    return process.nextTick(() => callback(ex));
   }
 
   this.collections[options.modelName].deleteMany(selector, err => {
@@ -275,8 +275,8 @@ ListStore.prototype.read = function (options, callback) {
   if (options.query.where) {
     try {
       selector = translate.selector(options.query.where);
-    } catch (err) {
-      return process.nextTick(() => callback(err));
+    } catch (ex) {
+      return process.nextTick(() => callback(ex));
     }
   }
 
@@ -285,8 +285,8 @@ ListStore.prototype.read = function (options, callback) {
   if (options.query.orderBy) {
     try {
       cursor = cursor.sort(translate.orderBy(options.query.orderBy));
-    } catch (err) {
-      return process.nextTick(() => callback(err));
+    } catch (ex) {
+      return process.nextTick(() => callback(ex));
     }
   } else {
     // If no query is given, MongoDB returns the result in an arbitrary (?)
