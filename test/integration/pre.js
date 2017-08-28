@@ -17,7 +17,7 @@ const pre = function (done) {
       shell.exec('docker run -d -p 27019:27017 --name mongodb-integration mongo:3.4.2', callback);
     },
     runPostgres (callback) {
-      shell.exec('docker run -d -p 5434:5432 -e POSTGRES_USER=wolkenkit -e POSTGRES_PASSWORD=wolkenkit -e POSTGRES_DB=wolkenkit --name postgres-integration postgres:9.6.2-alpine', callback);
+      shell.exec('docker run -d -p 5434:5432 -e POSTGRES_USER=wolkenkit -e POSTGRES_PASSWORD=wolkenkit -e POSTGRES_DB=wolkenkit --name postgres-integration postgres:9.6.4-alpine', callback);
     },
     waitForRabbitMq (callback) {
       waitForRabbitMq({ url: env.RABBITMQ_URL_INTEGRATION }, callback);

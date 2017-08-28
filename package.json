@@ -21,14 +21,14 @@
     }
   ],
   "dependencies": {
-    "async": "2.4.1",
+    "async": "2.5.0",
     "commands-events": "1.0.0",
     "lodash": "4.17.4",
-    "mongodb": "2.2.28",
+    "mongodb": "2.2.31",
     "processenv": "0.1.1",
     "require-dir": "0.3.2",
     "sha1": "1.1.1",
-    "sparbuch": "1.0.0",
+    "sparbuch": "1.0.1",
     "stack-trace": "0.0.10",
     "streamtoarray": "0.1.4",
     "tailwind": "1.0.1",
@@ -36,17 +36,18 @@
     "wolkenkit-application": "1.0.0"
   },
   "devDependencies": {
-    "assertthat": "0.9.0",
+    "assertthat": "0.10.3",
     "hase": "0.5.4",
     "json-lines-client": "0.7.9",
     "limes": "0.5.0",
-    "pg": "6.2.4",
+    "pg": "7.2.0",
+    "pg-connection-string": "0.1.3",
     "record-stdstreams": "0.1.0",
-    "roboter": "0.15.2",
-    "roboter-server": "0.15.2",
+    "roboter": "0.15.4",
+    "roboter-server": "0.15.4",
     "runfork": "0.3.1",
     "shelljs": "0.7.8",
-    "superagent": "3.5.2"
+    "superagent": "3.6.0"
   },
   "repository": {
     "type": "git",
