@@ -1,88 +1,82 @@
 'use strict';
 
-const async = require('async');
-
 const createReadModelAggregate = require('./readModelAggregates/create'),
-      Services = require('./Services');
+      getServices = require('./services/get');
 
-const EventHandler = function (options) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.app) {
-    throw new Error('App is missing.');
-  }
-  if (!options.readModel) {
-    throw new Error('Read model is missing.');
-  }
-  if (!options.modelStore) {
-    throw new Error('Model store is missing.');
-  }
+class EventHandler {
+  constructor ({ app, readModel, modelStore }) {
+    if (!app) {
+      throw new Error('App is missing.');
+    }
+    if (!readModel) {
+      throw new Error('Read model is missing.');
+    }
+    if (!modelStore) {
+      throw new Error('Model store is missing.');
+    }
 
-  this.app = options.app;
-  this.readModel = options.readModel;
-  this.modelStore = options.modelStore;
+    this.app = app;
+    this.readModel = readModel;
+    this.modelStore = modelStore;
 
-  this.services = new Services({
-    app: options.app,
-    readModel: options.readModel,
-    modelStore: options.modelStore
-  });
+    this.eventListeners = {};
 
-  this.eventListeners = {};
-  Object.keys(options.readModel).forEach(modelType => {
-    Object.keys(options.readModel[modelType]).forEach(modelName => {
-      Object.keys(options.readModel[modelType][modelName].when).forEach(eventName => {
-        const eventListener = options.readModel[modelType][modelName].when[eventName];
+    Object.keys(readModel).forEach(modelType => {
+      Object.keys(readModel[modelType]).forEach(modelName => {
+        Object.keys(readModel[modelType][modelName].when).forEach(eventName => {
+          const eventListener = readModel[modelType][modelName].when[eventName];
 
-        eventListener.modelType = modelType;
-        eventListener.modelName = modelName;
+          eventListener.modelType = modelType;
+          eventListener.modelName = modelName;
 
-        this.eventListeners[eventName] = this.eventListeners[eventName] || [];
-        this.eventListeners[eventName].push(eventListener);
+          this.eventListeners[eventName] = this.eventListeners[eventName] || [];
+          this.eventListeners[eventName].push(eventListener);
+        });
       });
     });
-  });
-};
+  }
 
-EventHandler.prototype.handle = function (domainEvent, callback) {
-  const eventName = `${domainEvent.context.name}.${domainEvent.aggregate.name}.${domainEvent.name}`;
-  const modelEvents = [];
-
-  async.each(this.eventListeners[eventName], (eventListener, done) => {
-    const readModelAggregate = createReadModelAggregate({
-      readModel: this.readModel[eventListener.modelType][eventListener.modelName],
-      modelStore: this.modelStore,
-      modelType: eventListener.modelType,
-      modelName: eventListener.modelName,
-      domainEvent
-    });
-
-    const mark = {
-      asDone () {
-        modelEvents.push(...readModelAggregate.uncommittedEvents);
-        process.nextTick(() => done(null));
-      },
-      asFailed (reason) {
-        process.nextTick(() => done(new Error(reason)));
-      }
-    };
-
-    try {
-      if (eventListener.length === 4) {
-        eventListener(readModelAggregate, domainEvent, this.services, mark);
-      } else {
-        eventListener(readModelAggregate, domainEvent, mark);
-      }
-    } catch (ex) {
-      process.nextTick(() => done(ex));
+  async handle (domainEvent) {
+    if (!domainEvent) {
+      throw new Error('Domain event is missing.');
     }
-  }, err => {
-    if (err) {
-      return callback(err);
+
+    const eventName = `${domainEvent.context.name}.${domainEvent.aggregate.name}.${domainEvent.name}`;
+    const modelEvents = [];
+
+    for (let i = 0; i < this.eventListeners[eventName].length; i++) {
+      const eventListener = this.eventListeners[eventName][i];
+      const { modelType, modelName } = eventListener;
+
+      const readModelAggregate = createReadModelAggregate({
+        readModel: this.readModel[eventListener.modelType][eventListener.modelName],
+        modelStore: this.modelStore,
+        modelType,
+        modelName,
+        domainEvent
+      });
+
+      domainEvent.failed = function (reason) {
+        // Should we use a custom Error here?
+        throw new Error(reason);
+      };
+
+      const { app, readModel, modelStore } = this;
+      const services = getServices({ app, readModel, modelStore, modelType, modelName });
+
+      try {
+        eventListener(readModelAggregate, domainEvent, services);
+      } catch (ex) {
+        // Should we check for specific errors?
+        // and should we log this error with flaschenpost? (like wolkenkit-core does)
+        throw ex;
+      }
+
+      modelEvents.push(...readModelAggregate.uncommittedEvents);
     }
-    callback(null, modelEvents);
-  });
-};
+
+    return modelEvents;
+  }
+}
 
 module.exports = EventHandler;

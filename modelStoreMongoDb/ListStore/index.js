@@ -1,327 +1,213 @@
 'use strict';
 
-const EventEmitter = require('events').EventEmitter,
-      util = require('util');
+const { EventEmitter } = require('events');
 
-const _ = require('lodash'),
-      async = require('async'),
-      MongoClient = require('mongodb').MongoClient,
+const cloneDeep = require('lodash/cloneDeep'),
+      find = require('lodash/find'),
+      { MongoClient } = require('mongodb'),
+      omit = require('lodash/omit'),
       sha1 = require('sha1');
 
 const translate = require('./translate');
 
-const ListStore = function (options) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.url) {
-    throw new Error('Url is missing.');
-  }
-  if (!options.eventSequencer) {
-    throw new Error('Event sequencer is missing.');
-  }
+class ListStore extends EventEmitter {
+  constructor ({ url, eventSequencer }) {
+    if (!url) {
+      throw new Error('Url is missing.');
+    }
+    if (!eventSequencer) {
+      throw new Error('Event sequencer is missing.');
+    }
 
-  this.url = options.url;
-  this.eventSequencer = options.eventSequencer;
+    super();
 
-  this.collections = {};
-  this.collectionsInternal = {};
-};
+    this.url = url;
+    this.eventSequencer = eventSequencer;
 
-util.inherits(ListStore, EventEmitter);
-
-ListStore.prototype.initialize = function (options, callback) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.application) {
-    throw new Error('Application is missing.');
-  }
-  if (!options.readModel) {
-    throw new Error('Read model is missing.');
-  }
-  if (!callback) {
-    throw new Error('Callback is missing.');
+    this.collections = {};
+    this.collectionsInternal = {};
   }
 
-  // Required for async.waterfall, unfortunately.
-  const that = this;
+  async initialize ({ application, readModel }) {
+    if (!application) {
+      throw new Error('Application is missing.');
+    }
+    if (!readModel) {
+      throw new Error('Read model is missing.');
+    }
 
-  that.application = options.application;
-  that.modelNames = Object.keys(options.readModel);
-  that.db = undefined;
+    this.application = application;
+    this.modelNames = Object.keys(readModel);
 
-  async.series({
-    connectToDatabase (done) {
-      /* eslint-disable id-length */
-      MongoClient.connect(that.url, { w: 1 }, (err, db) => {
-        /* eslint-enable id-length */
-        if (err) {
-          return done(err);
-        }
-        that.db = db;
-        done(null);
-      });
-    },
-    watchForDisconnects (done) {
-      that.db.on('close', () => {
-        that.emit('disconnect');
-      });
-      done(null);
-    },
-    createModelCollections (done) {
-      async.each(that.modelNames, (modelName, doneEach) => {
-        that.db.collection(`${options.application}_model_list_${modelName}`, (err, collection) => {
-          if (err) {
-            return doneEach(err);
-          }
+    /* eslint-disable id-length */
+    this.db = await MongoClient.connect(this.url, { w: 1 });
+    /* eslint-enable id-length */
 
-          that.collections[modelName] = collection;
-          doneEach(null);
-        });
-      }, done);
-    },
-    createIndexesForModels (done) {
-      async.each(that.modelNames, (modelName, doneEach) => {
-        const fields = _.cloneDeep(options.readModel[modelName].fields);
+    this.db.on('close', () => {
+      this.emit('disconnect');
+    });
 
-        fields.id = { fastLookup: true, isUnique: true };
+    for (let i = 0; i < this.modelNames; i++) {
+      const modelName = this.modelNames[i];
+      const collection = await this.db.collection(`${application}_model_list_${modelName}`);
 
-        const indexes = [];
+      this.collections[modelName] = collection;
+    }
 
-        Object.keys(fields).forEach(fieldName => {
-          if (!fields[fieldName].fastLookup && !fields[fieldName].isUnique) {
-            return;
-          }
+    for (let i = 0; i < this.modelNames.length; i++) {
+      const modelName = this.modelNames[i];
+      const fields = cloneDeep(readModel[modelName].fields);
 
-          indexes.push({
-            key: { [fieldName]: 1 },
-            name: sha1(`${options.application}_model_list_${modelName}_${fieldName}`).substr(0, 10),
-            unique: Boolean(fields[fieldName].isUnique)
-          });
-        });
+      fields.id = { fastLookup: true, isUnique: true };
 
-        that.collections[modelName].createIndexes(indexes, doneEach);
-      }, done);
-    },
-    createPositionsCollection (done) {
-      that.db.collection(`${options.application}_model_positions`, (err, collection) => {
-        if (err) {
-          return done(err);
+      const indexes = [];
+      const fieldNames = Object.keys(fields);
+
+      for (let j = 0; j < fieldNames.length; j++) {
+        const fieldName = fieldNames[j];
+
+        if (!fields[fieldName].fastLookup && !fields[fieldName].isUnique) {
+          continue;
         }
 
-        that.collectionsInternal.positions = collection;
-        done(null);
-      });
-    },
-    createIndexesForPositions (done) {
-      that.collectionsInternal.positions.createIndex({
-        type: 1, name: 1
-      }, {
-        name: sha1(`${options.application}_model_positions`).substr(0, 10),
-        unique: true
-      }, done);
-    },
-    initializePositions (done) {
-      async.each(that.modelNames, (modelName, doneEach) => {
-        that.collectionsInternal.positions.insertOne({
+        indexes.push({
+          key: { [fieldName]: 1 },
+          name: sha1(`${application}_model_list_${modelName}_${fieldName}`).substr(0, 10),
+          unique: Boolean(fields[fieldName].isUnique)
+        });
+      }
+
+      await this.collections[modelName].createIndexes(indexes);
+    }
+
+    this.collectionsInternal.positions = await this.db.collection(`${application}_model_positions`);
+
+    await this.collectionsInternal.positions.createIndex(
+      { type: 1, name: 1 },
+      { name: sha1(`${application}_model_positions`).substr(0, 10), unique: true }
+    );
+
+    for (let i = 0; i < this.modelNames.length; i++) {
+      const modelName = this.modelNames[i];
+
+      try {
+        await this.collectionsInternal.positions.insertOne({
           type: 'lists',
           name: modelName,
           lastProcessedPosition: 0
-        }, err => {
-          // Ignore duplicate key exceptions, because the position had already
-          // been persisted and we do not need to create it now.
-          if (err && err.code !== 11000) {
-            return doneEach(err);
-          }
-          doneEach(null);
         });
-      }, done);
-    },
-    registerModelsOnEventSequencer (done) {
-      that.collectionsInternal.positions.find({ type: 'lists' }).toArray((err, positions) => {
-        if (err) {
-          return done(err);
+      } catch (ex) {
+        // Ignore duplicate key exceptions, because the position had already
+        // been persisted and we do not need to create it now.
+        if (ex.code !== 11000) {
+          throw ex;
         }
+      }
+    }
 
-        that.modelNames.forEach(modelName => {
-          that.eventSequencer.registerModel({
-            type: 'lists',
-            name: modelName,
-            lastProcessedPosition: _.find(positions, { name: modelName }).lastProcessedPosition
-          });
-        });
-        done(null);
+    const positions = await this.collectionsInternal.positions.find({ type: 'lists' }).toArray();
+
+    this.modelNames.forEach(modelName => {
+      this.eventSequencer.registerModel({
+        type: 'lists',
+        name: modelName,
+        lastProcessedPosition: find(positions, { name: modelName }).lastProcessedPosition
       });
+    });
+  }
+
+  async added ({ modelName, payload }) {
+    if (!modelName) {
+      throw new Error('Model name is missing.');
     }
-  }, err => {
-    if (err) {
-      return callback(err);
+    if (!payload) {
+      throw new Error('Payload is missing.');
     }
 
-    callback(null);
-  });
-};
+    await this.collections[modelName].insertOne(payload);
 
-ListStore.prototype.added = function (options, callback) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.modelName) {
-    throw new Error('Model name is missing.');
-  }
-  if (!options.payload) {
-    throw new Error('Payload is missing.');
-  }
-  if (!callback) {
-    throw new Error('Callback is missing.');
+    Reflect.deleteProperty(payload, '_id');
   }
 
-  this.collections[options.modelName].insertOne(options.payload, err => {
-    Reflect.deleteProperty(options.payload, '_id');
-
-    if (err) {
-      return callback(err);
+  async updated ({ modelName, selector, payload }) {
+    if (!modelName) {
+      throw new Error('Model name is missing.');
     }
-    callback(null);
-  });
-};
-
-ListStore.prototype.updated = function (options, callback) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.modelName) {
-    throw new Error('Model name is missing.');
-  }
-  if (!options.selector) {
-    throw new Error('Selector is missing.');
-  }
-  if (!options.payload) {
-    throw new Error('Payload is missing.');
-  }
-  if (!callback) {
-    throw new Error('Callback is missing.');
-  }
-
-  let payload,
-      selector;
-
-  try {
-    payload = translate.payload(options.payload);
-    selector = translate.selector(options.selector);
-  } catch (ex) {
-    return process.nextTick(() => callback(ex));
-  }
-
-  this.collections[options.modelName].updateMany(selector, payload, err => {
-    if (err) {
-      return callback(err);
+    if (!selector) {
+      throw new Error('Selector is missing.');
     }
-    callback(null);
-  });
-};
-
-ListStore.prototype.removed = function (options, callback) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.modelName) {
-    throw new Error('Model name is missing.');
-  }
-  if (!options.selector) {
-    throw new Error('Selector is missing.');
-  }
-  if (!callback) {
-    throw new Error('Callback is missing.');
-  }
-
-  let selector;
-
-  try {
-    selector = translate.selector(options.selector);
-  } catch (ex) {
-    return process.nextTick(() => callback(ex));
-  }
-
-  this.collections[options.modelName].deleteMany(selector, err => {
-    if (err) {
-      return callback(err);
+    if (!payload) {
+      throw new Error('Payload is missing.');
     }
-    callback(null);
-  });
-};
 
-ListStore.prototype.read = function (options, callback) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.modelName) {
-    throw new Error('Model name is missing.');
-  }
-  if (!options.query) {
-    throw new Error('Query is missing.');
-  }
-  if (!callback) {
-    throw new Error('Callback is missing.');
+    const translatedPayload = translate.payload(payload),
+          translatedSelector = translate.selector(selector);
+
+    await this.collections[modelName].updateMany(translatedSelector, translatedPayload);
   }
 
-  if (!this.collections[options.modelName]) {
-    return process.nextTick(() => callback(new Error('Unknown model name.')));
-  }
-
-  let selector;
-
-  if (options.query.where) {
-    try {
-      selector = translate.selector(options.query.where);
-    } catch (ex) {
-      return process.nextTick(() => callback(ex));
+  async removed ({ modelName, selector }) {
+    if (!modelName) {
+      throw new Error('Model name is missing.');
     }
-  }
-
-  let cursor = this.collections[options.modelName].find(selector);
-
-  if (options.query.orderBy) {
-    try {
-      cursor = cursor.sort(translate.orderBy(options.query.orderBy));
-    } catch (ex) {
-      return process.nextTick(() => callback(ex));
+    if (!selector) {
+      throw new Error('Selector is missing.');
     }
-  } else {
-    // If no query is given, MongoDB returns the result in an arbitrary (?)
-    // order. To restore the natural order, sort by its internal key, which
-    // is ascending.
-    cursor = cursor.sort({ _id: 1 });
+    const translatedSelector = translate.selector(selector);
+
+    await this.collections[modelName].deleteMany(translatedSelector);
   }
 
-  if (options.query.skip) {
-    cursor = cursor.skip(options.query.skip);
-  }
-  cursor = cursor.limit(options.query.take || 100);
-
-  const result = cursor.stream({
-    transform: item => _.omit(item, '_id')
-  });
-
-  process.nextTick(() => callback(null, result));
-};
-
-ListStore.prototype.updatePosition = function (position, callback) {
-  if (typeof position !== 'number') {
-    throw new Error('Position is missing.');
-  }
-  if (!callback) {
-    throw new Error('Callback is missing.');
-  }
-
-  this.collectionsInternal.positions.updateMany({
-    type: 'lists',
-    lastProcessedPosition: { $lt: position }
-  }, { $set: { lastProcessedPosition: position }}, err => {
-    if (err) {
-      return callback(err);
+  async read ({ modelName, query }) {
+    if (!modelName) {
+      throw new Error('Model name is missing.');
     }
+    if (!query) {
+      throw new Error('Query is missing.');
+    }
+
+    if (!this.collections[modelName]) {
+      throw new Error('Unknown model name.');
+    }
+
+    let translatedSelector;
+
+    if (query.where) {
+      translatedSelector = translate.selector(query.where);
+    }
+
+    let cursor = await this.collections[modelName].find(translatedSelector);
+
+    if (query.orderBy) {
+      cursor = cursor.sort(translate.orderBy(query.orderBy));
+    } else {
+      // If no query is given, MongoDB returns the result in an arbitrary (?)
+      // order. To restore the natural order, sort by its internal key, which
+      // is ascending.
+      cursor = cursor.sort({ _id: 1 });
+    }
+
+    if (query.skip) {
+      cursor = cursor.skip(query.skip);
+    }
+    cursor = cursor.limit(query.take || 100);
+
+    const result = cursor.stream({
+      transform: item => omit(item, '_id')
+    });
+
+    return result;
+  }
+
+  async updatePosition (position) {
+    if (typeof position !== 'number') {
+      throw new Error('Position is missing.');
+    }
+
+    await this.collectionsInternal.positions.updateMany(
+      { type: 'lists', lastProcessedPosition: { $lt: position }},
+      { $set: { lastProcessedPosition: position }}
+    );
 
     this.modelNames.forEach(modelName => {
       if (position <= this.eventSequencer.models.lists[modelName].lastProcessedPosition) {
@@ -334,9 +220,7 @@ ListStore.prototype.updatePosition = function (position, callback) {
         position
       });
     });
-
-    callback(null);
-  });
-};
+  }
+}
 
 module.exports = ListStore;
