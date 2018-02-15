@@ -4,6 +4,7 @@ const { EventEmitter } = require('events');
 
 const cloneDeep = require('lodash/cloneDeep'),
       find = require('lodash/find'),
+      mongodbUri = require('mongodb-uri'),
       { MongoClient } = require('mongodb'),
       omit = require('lodash/omit'),
       sha1 = require('sha1');
@@ -40,16 +41,19 @@ class ListStore extends EventEmitter {
     this.modelNames = Object.keys(readModel);
 
     /* eslint-disable id-length */
-    this.db = await MongoClient.connect(this.url, { w: 1 });
+    const client = await MongoClient.connect(this.url, { w: 1 });
     /* eslint-enable id-length */
 
-    this.db.on('close', () => {
+    client.on('close', () => {
       this.emit('disconnect');
     });
 
-    for (let i = 0; i < this.modelNames; i++) {
+    const uri = mongodbUri.parse(this.url);
+    const db = client.db(uri.database);
+
+    for (let i = 0; i < this.modelNames.length; i++) {
       const modelName = this.modelNames[i];
-      const collection = await this.db.collection(`${application}_model_list_${modelName}`);
+      const collection = await db.collection(`${application}_model_list_${modelName}`);
 
       this.collections[modelName] = collection;
     }
@@ -80,7 +84,7 @@ class ListStore extends EventEmitter {
       await this.collections[modelName].createIndexes(indexes);
     }
 
-    this.collectionsInternal.positions = await this.db.collection(`${application}_model_positions`);
+    this.collectionsInternal.positions = await db.collection(`${application}_model_positions`);
 
     await this.collectionsInternal.positions.createIndex(
       { type: 1, name: 1 },

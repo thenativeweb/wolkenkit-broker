@@ -1,15 +1,16 @@
 'use strict';
 
-const async = require('async');
+const performReplay = async function ({ eventStore, fromPosition, toPosition, handleReplayedDomainEvent }) {
+  if (!eventStore) {
+    throw new Error('Event store is missing.');
+  }
+  if (!handleReplayedDomainEvent) {
+    throw new Error('Handle replayed domain event is missing.');
+  }
 
-const performReplay = function (options, callback) {
-  const { eventStore, fromPosition, toPosition, handleReplayedDomainEvent } = options;
+  const replayStream = await eventStore.getReplay({ fromPosition, toPosition });
 
-  eventStore.getReplay({ fromPosition, toPosition }, (err, replayStream) => {
-    if (err) {
-      return callback(err);
-    }
-
+  await new Promise((resolve, reject) => {
     let onData,
         onEnd,
         onError;
@@ -22,35 +23,37 @@ const performReplay = function (options, callback) {
 
     let isOnDataProcessing = false;
 
-    onData = function (replayedDomainEvent) {
+    onData = async function (replayedDomainEvent) {
       isOnDataProcessing = true;
       replayStream.pause();
 
-      handleReplayedDomainEvent(replayedDomainEvent, errHandleReplayedDomainEvent => {
+      try {
+        await handleReplayedDomainEvent(replayedDomainEvent);
+      } catch (ex) {
+        return onError(ex);
+      } finally {
         isOnDataProcessing = false;
+      }
 
-        if (errHandleReplayedDomainEvent) {
-          return onError(errHandleReplayedDomainEvent);
-        }
-        replayStream.resume();
-      });
+      replayStream.resume();
     };
 
-    onEnd = function () {
+    onEnd = async function () {
       unsubscribe();
-      async.whilst(
-        () => isOnDataProcessing,
-        done => setTimeout(done, 100),
-        () => {
-          callback(null);
-        }
-      );
+
+      /* eslint-disable no-unmodified-loop-condition */
+      while (isOnDataProcessing) {
+        await new Promise(resolveTimer => setTimeout(resolveTimer, 100));
+      }
+      /* eslint-enable no-unmodified-loop-condition */
+
+      resolve();
     };
 
-    onError = function (errStream) {
+    onError = function (err) {
       unsubscribe();
       replayStream.resume();
-      callback(errStream);
+      reject(err);
     };
 
     replayStream.on('data', onData);

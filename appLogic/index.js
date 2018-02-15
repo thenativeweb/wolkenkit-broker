@@ -6,27 +6,23 @@ const getEventHandlingStrategies = require('./getEventHandlingStrategies');
 
 const PassThrough = stream.PassThrough;
 
-const appLogic = function (options) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.app) {
+const appLogic = function ({ app, eventSequencer, eventStore, modelStore, readModel }) {
+  if (!app) {
     throw new Error('App is missing.');
   }
-  if (!options.eventSequencer) {
+  if (!eventSequencer) {
     throw new Error('Event sequencer is missing.');
   }
-  if (!options.eventStore) {
+  if (!eventStore) {
     throw new Error('Event store is missing.');
   }
-  if (!options.modelStore) {
+  if (!modelStore) {
     throw new Error('Model store is missing.');
   }
-  if (!options.readModel) {
+  if (!readModel) {
     throw new Error('Read model is missing.');
   }
 
-  const { app, eventSequencer, eventStore, modelStore, readModel } = options;
   const logger = app.services.getLogger();
 
   const eventHandlingStrategies = getEventHandlingStrategies({ app, eventStore, modelStore, readModel });
@@ -45,43 +41,39 @@ const appLogic = function (options) {
     });
   });
 
-  app.api.read = function (modelType, modelName, readOptions, callback) {
-    modelStore.read({
+  app.api.read = async function (modelType, modelName, { where, orderBy, skip, take }) {
+    const incomingStream = modelStore.read({
       modelType,
       modelName,
       query: {
-        where: readOptions.where,
-        orderBy: readOptions.orderBy,
-        skip: readOptions.skip,
-        take: readOptions.take
+        where,
+        orderBy,
+        skip,
+        take
       }
-    }, (err, incomingStream) => {
-      if (err) {
-        return callback(err);
-      }
-
-      // The outgoingStream is the stream that is used to send data to the
-      // client over some push mechanism such as SSE or web sockets.
-      const outgoingStream = new PassThrough({ objectMode: true });
-
-      // When the client disconnects actively, we need to stop sending
-      // results, hence we unpipe. This pauses the incomingStream, which
-      // still may have unread data in it. Hence we need to resume it
-      // to make sure that there are no unread data left in memory that
-      // keeps the GC from removing the stream. Additionally, if the
-      // incomingStream is a live stream, there is no one that will ever
-      // call end() on the stream, hence we need to do it here to avoid
-      // the stream to stay open forever.
-      outgoingStream.once('finish', () => {
-        incomingStream.unpipe(outgoingStream);
-        incomingStream.resume();
-      });
-
-      // Now, start the actual work and pipe the results to the client.
-      incomingStream.pipe(outgoingStream);
-
-      callback(null, outgoingStream);
     });
+
+    // The outgoingStream is the stream that is used to send data to the
+    // client over some push mechanism such as SSE or web sockets.
+    const outgoingStream = new PassThrough({ objectMode: true });
+
+    // When the client disconnects actively, we need to stop sending
+    // results, hence we unpipe. This pauses the incomingStream, which
+    // still may have unread data in it. Hence we need to resume it
+    // to make sure that there are no unread data left in memory that
+    // keeps the GC from removing the stream. Additionally, if the
+    // incomingStream is a live stream, there is no one that will ever
+    // call end() on the stream, hence we need to do it here to avoid
+    // the stream to stay open forever.
+    outgoingStream.once('finish', () => {
+      incomingStream.unpipe(outgoingStream);
+      incomingStream.resume();
+    });
+
+    // Now, start the actual work and pipe the results to the client.
+    incomingStream.pipe(outgoingStream);
+
+    return outgoingStream;
   };
 
   app.api.incoming.on('data', command => {
@@ -90,21 +82,21 @@ const appLogic = function (options) {
     logger.info('Sent command.', command);
   });
 
-  app.eventbus.incoming.on('data', domainEvent => {
+  app.eventbus.incoming.on('data', async domainEvent => {
     logger.info('Received event.', { domainEvent });
 
     const strategy = eventSequencer.getStrategyFor(domainEvent);
 
-    eventHandlingStrategies[strategy.type](domainEvent, strategy, err => {
-      if (err) {
-        logger.error('Failed to handle event.', { domainEvent, err });
+    try {
+      await eventHandlingStrategies[strategy.type](domainEvent, strategy);
+    } catch (ex) {
+      logger.error('Failed to handle event.', { domainEvent, ex });
 
-        return domainEvent.discard();
-      }
+      return domainEvent.discard();
+    }
 
-      logger.info('Successfully handled event.', { domainEvent });
-      domainEvent.next();
-    });
+    logger.info('Successfully handled event.', { domainEvent });
+    domainEvent.next();
   });
 };
 

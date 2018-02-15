@@ -1,6 +1,6 @@
 'use strict';
 
-const createReadModelAggregate = require('../../readModelAggregates/create');
+const createReadModelAggregate = require('../readModelAggregates/create');
 
 let app;
 

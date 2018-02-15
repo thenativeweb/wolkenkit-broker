@@ -44,6 +44,10 @@ class EventHandler {
     const eventName = `${domainEvent.context.name}.${domainEvent.aggregate.name}.${domainEvent.name}`;
     const modelEvents = [];
 
+    if (!this.eventListeners[eventName]) {
+      return modelEvents;
+    }
+
     for (let i = 0; i < this.eventListeners[eventName].length; i++) {
       const eventListener = this.eventListeners[eventName][i];
       const { modelType, modelName } = eventListener;
@@ -65,7 +69,7 @@ class EventHandler {
       const services = getServices({ app, readModel, modelStore, modelType, modelName });
 
       try {
-        eventListener(readModelAggregate, domainEvent, services);
+        await eventListener(readModelAggregate, domainEvent, services);
       } catch (ex) {
         // Should we check for specific errors?
         // and should we log this error with flaschenpost? (like wolkenkit-core does)

@@ -3,77 +3,62 @@
 const EventHandler = require('../EventHandler'),
       performReplay = require('./performReplay');
 
-const getEventHandlingStrategies = function (options) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.app) {
+const getEventHandlingStrategies = function ({ app, eventStore, modelStore, readModel }) {
+  if (!app) {
     throw new Error('App is missing.');
   }
-  if (!options.eventStore) {
+  if (!eventStore) {
     throw new Error('Event store is missing.');
   }
-  if (!options.modelStore) {
+  if (!modelStore) {
     throw new Error('Model store is missing.');
   }
+  if (!readModel) {
+    throw new Error('Read model is missing.');
+  }
 
-  const { app, eventStore, modelStore } = options;
-
-  const eventHandler = new EventHandler(options),
+  const eventHandler = new EventHandler({ app, readModel, modelStore }),
         logger = app.services.getLogger();
 
   const strategies = {
-    skip (domainEvent, strategy, callback) {
+    async skip (domainEvent) {
       logger.info('Skipped event.', domainEvent);
-      callback(null);
     },
 
-    replay (domainEvent, strategy, callback) {
+    async replay (domainEvent, strategy) {
       const { fromPosition, toPosition } = strategy;
 
       logger.info('Replaying events...', { fromPosition, toPosition });
 
-      performReplay({
+      await performReplay({
         eventStore,
         fromPosition,
         toPosition,
-        handleReplayedDomainEvent (replayedDomainEvent, done) {
+        async handleReplayedDomainEvent (replayedDomainEvent) {
           const isLastEvent = replayedDomainEvent.metadata.position === domainEvent.metadata.position;
 
-          strategies.proceed(replayedDomainEvent, { type: 'proceed', forward: isLastEvent }, done);
+          await strategies.proceed(replayedDomainEvent, { type: 'proceed', forward: isLastEvent });
         }
-      }, callback);
+      });
     },
 
-    forward (domainEvent, strategy, callback) {
+    async forward (domainEvent) {
+      app.api.outgoing.write(domainEvent);
+    },
+
+    async proceed (domainEvent, strategy) {
+      const modelEvents = await eventHandler.handle(domainEvent);
+
+      await modelStore.processEvents(domainEvent, modelEvents);
+
+      if (strategy.forward === false) {
+        return;
+      }
+
       app.api.outgoing.write(domainEvent);
 
-      callback(null);
-    },
-
-    proceed (domainEvent, strategy, callback) {
-      eventHandler.handle(domainEvent, (errHandle, modelEvents) => {
-        if (errHandle) {
-          return callback(errHandle);
-        }
-
-        modelStore.processEvents(domainEvent, modelEvents, errProcessEvents => {
-          if (errProcessEvents) {
-            return callback(errProcessEvents);
-          }
-
-          if (strategy.forward === false) {
-            return callback(null);
-          }
-
-          app.api.outgoing.write(domainEvent);
-
-          modelEvents.forEach(modelEvent => {
-            app.api.outgoing.write(modelEvent);
-          });
-
-          callback(null);
-        });
+      modelEvents.forEach(modelEvent => {
+        app.api.outgoing.write(modelEvent);
       });
     }
   };
