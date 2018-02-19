@@ -29,7 +29,7 @@ const when = {
         where: { id: event.aggregate.id }
       });
     } catch (ex) {
-      return event.failed(ex.message);
+      return event.fail(ex.message);
     }
 
     tasteMakers.update({

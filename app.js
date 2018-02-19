@@ -82,7 +82,6 @@ const eventSequencer = require('./eventSequencer'),
     clientRegistry: 'wolkenkit',
     host: app.env('API_HOST'),
     port: app.env('API_PORT'),
-    portPublic: app.env('API_PORT_PUBLIC') || app.env('API_PORT'),
     corsOrigin: getCorsOrigin(app.env('API_CORS_ORIGIN')),
     writeModel: application.configuration.writeModel,
     readModel: application.configuration.readModel

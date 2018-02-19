@@ -27,48 +27,36 @@ suite('create', () => {
     });
   });
 
-  test('is a function.', done => {
+  test('is a function.', async () => {
     assert.that(create).is.ofType('function');
-    done();
   });
 
-  test('throws an error if options are missing.', done => {
-    assert.that(() => {
-      create();
-    }).is.throwing('Options are missing.');
-    done();
-  });
-
-  test('throws an error if read model is missing.', done => {
+  test('throws an error if read model is missing.', async () => {
     assert.that(() => {
       create({});
     }).is.throwing('Read model is missing.');
-    done();
   });
 
-  test('throws an error if model store is missing.', done => {
+  test('throws an error if model store is missing.', async () => {
     assert.that(() => {
       create({ readModel });
     }).is.throwing('Model store is missing.');
-    done();
   });
 
-  test('throws an error if model type is missing.', done => {
+  test('throws an error if model type is missing.', async () => {
     assert.that(() => {
       create({ readModel, modelStore });
     }).is.throwing('Model type is missing.');
-    done();
   });
 
-  test('throws an error if model name is missing.', done => {
+  test('throws an error if model name is missing.', async () => {
     assert.that(() => {
       create({ readModel, modelStore, modelType: 'lists' });
     }).is.throwing('Model name is missing.');
-    done();
   });
 
   suite('read model aggregate', () => {
-    test('is an object.', done => {
+    test('is an object.', async () => {
       const readModelAggregate = create({
         readModel,
         modelStore,
@@ -78,10 +66,9 @@ suite('create', () => {
       });
 
       assert.that(readModelAggregate).is.ofType('object');
-      done();
     });
 
-    test('has an empty list of uncommitted events.', done => {
+    test('has an empty list of uncommitted events.', async () => {
       const readModelAggregate = create({
         readModel,
         modelStore,
@@ -91,10 +78,9 @@ suite('create', () => {
       });
 
       assert.that(readModelAggregate.uncommittedEvents).is.equalTo([]);
-      done();
     });
 
-    test('is a list aggregate if the model type is set to list.', done => {
+    test('is a list aggregate if the model type is set to list.', async () => {
       const readModelAggregate = create({
         readModel,
         modelStore,
@@ -104,10 +90,9 @@ suite('create', () => {
       });
 
       assert.that(readModelAggregate).is.instanceOf(ListAggregate.Writable);
-      done();
     });
 
-    test('is a writable aggregate if domain event is given.', done => {
+    test('is a writable aggregate if domain event is given.', async () => {
       const readModelAggregate = create({
         readModel,
         modelStore,
@@ -117,10 +102,9 @@ suite('create', () => {
       });
 
       assert.that(readModelAggregate).is.instanceOf(ListAggregate.Writable);
-      done();
     });
 
-    test('is a readable aggregate if no domain event is given.', done => {
+    test('is a readable aggregate if no domain event is given.', async () => {
       const readModelAggregate = create({
         readModel,
         modelStore,
@@ -129,10 +113,9 @@ suite('create', () => {
       });
 
       assert.that(readModelAggregate).is.instanceOf(ListAggregate.Readable);
-      done();
     });
 
-    test('fills uncommitted events using aggregates.', done => {
+    test('fills uncommitted events using aggregates.', async () => {
       const readModelAggregate = create({
         readModel,
         modelStore,
@@ -152,7 +135,6 @@ suite('create', () => {
         participants: [],
         isAuthorized: domainEvent.metadata.isAuthorized
       });
-      done();
     });
   });
 });

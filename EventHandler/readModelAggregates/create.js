@@ -22,7 +22,6 @@ const create = function ({ readModel, modelStore, modelType, modelName, domainEv
         return new ListAggregate.Writable({
           readModel,
           modelStore,
-          modelType,
           modelName,
           domainEvent,
           uncommittedEvents: []
@@ -32,7 +31,6 @@ const create = function ({ readModel, modelStore, modelType, modelName, domainEv
       return new ListAggregate.Readable({
         readModel,
         modelStore,
-        modelType,
         modelName
       });
     default:

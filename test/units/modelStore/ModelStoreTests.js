@@ -21,16 +21,14 @@ suite('ModelStore', () => {
     eventSequencer = new EventSequencer();
   });
 
-  test('is a function.', done => {
+  test('is a function.', async () => {
     assert.that(ModelStore).is.ofType('function');
-    done();
   });
 
-  test('is an event emitter.', done => {
+  test('is an event emitter.', async () => {
     const modelStore = new ModelStore();
 
     assert.that(modelStore).is.instanceOf(EventEmitter);
-    done();
   });
 
   suite('initialize', () => {
@@ -40,90 +38,64 @@ suite('ModelStore', () => {
       modelStore = new ModelStore();
     });
 
-    test('is a function.', done => {
+    test('is a function.', async () => {
       assert.that(modelStore.initialize).is.ofType('function');
-      done();
     });
 
-    test('throws an error if options are missing.', done => {
-      assert.that(() => {
-        modelStore.initialize();
-      }).is.throwing('Options are missing.');
-      done();
+    test('throws an error if application is missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.initialize({});
+      }).is.throwingAsync('Application is missing.');
     });
 
-    test('throws an error if application is missing.', done => {
-      assert.that(() => {
-        modelStore.initialize({});
-      }).is.throwing('Application is missing.');
-      done();
-    });
-
-    test('throws an error if event sequencer is missing.', done => {
-      assert.that(() => {
-        modelStore.initialize({
+    test('throws an error if event sequencer is missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.initialize({
           application: 'foo'
         });
-      }).is.throwing('Event sequencer is missing.');
-      done();
+      }).is.throwingAsync('Event sequencer is missing.');
     });
 
-    test('throws an error if read model is missing.', done => {
-      assert.that(() => {
-        modelStore.initialize({
+    test('throws an error if read model is missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.initialize({
           application: 'foo',
           eventSequencer
         });
-      }).is.throwing('Read model is missing.');
-      done();
+      }).is.throwingAsync('Read model is missing.');
     });
 
-    test('throws an error if stores are missing.', done => {
-      assert.that(() => {
-        modelStore.initialize({
+    test('throws an error if stores are missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.initialize({
           application: 'foo',
           eventSequencer,
           readModel: {}
         });
-      }).is.throwing('Stores are missing.');
-      done();
+      }).is.throwingAsync('Stores are missing.');
     });
 
-    test('throws an error if callback is missing.', done => {
-      assert.that(() => {
-        modelStore.initialize({
-          application: 'foo',
-          eventSequencer,
-          readModel: {},
-          stores: {}
-        });
-      }).is.throwing('Callback is missing.');
-      done();
-    });
-
-    test('initializes the given stores.', done => {
+    test('initializes the given stores.', async () => {
       const listStore = {
         application: undefined,
         readModel: undefined,
-        initialize (options, callback) {
+        async initialize (options) {
           this.application = options.application;
           this.readModel = options.readModel;
-          callback(null);
         },
         on () {}
       };
       const treeStore = {
         application: undefined,
         readModel: undefined,
-        initialize (options, callback) {
+        async initialize (options) {
           this.application = options.application;
           this.readModel = options.readModel;
-          callback(null);
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {
@@ -134,28 +106,25 @@ suite('ModelStore', () => {
           lists: listStore,
           trees: treeStore
         }
-      }, err => {
-        assert.that(err).is.null();
-        assert.that(modelStore.stores.lists.application).is.equalTo('foo');
-        assert.that(modelStore.stores.lists.readModel).is.equalTo({ foo: 'bar' });
-        assert.that(modelStore.stores.trees.application).is.equalTo('foo');
-        assert.that(modelStore.stores.trees.readModel).is.equalTo({ bar: 'baz' });
-        done();
       });
+
+      assert.that(modelStore.stores.lists.application).is.equalTo('foo');
+      assert.that(modelStore.stores.lists.readModel).is.equalTo({ foo: 'bar' });
+      assert.that(modelStore.stores.trees.application).is.equalTo('foo');
+      assert.that(modelStore.stores.trees.readModel).is.equalTo({ bar: 'baz' });
     });
 
-    test('subscribes to the stores\' disconnect event.', done => {
+    test('subscribes to the stores\' disconnect event.', async () => {
       const listStore = new EventEmitter();
 
       listStore.application = undefined;
       listStore.readModel = undefined;
-      listStore.initialize = function (options, callback) {
+      listStore.initialize = async function (options) {
         this.application = options.application;
         this.readModel = options.readModel;
-        callback(null);
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {
@@ -164,39 +133,37 @@ suite('ModelStore', () => {
         stores: {
           lists: listStore
         }
-      }, err => {
-        assert.that(err).is.null();
+      });
 
+      await new Promise(resolve => {
         modelStore.once('disconnect', () => {
-          done(null);
+          resolve();
         });
 
         listStore.emit('disconnect');
       });
     });
 
-    test('returns an error if a store can not be initialized.', done => {
+    test('returns an error if a store can not be initialized.', async () => {
       const listStore = {
-        initialize (options, callback) {
-          callback(new Error('Error from list store.'));
+        async initialize () {
+          throw new Error('Error from list store.');
         },
         on () {}
       };
 
-      modelStore.initialize({
-        application: 'foo',
-        eventSequencer,
-        readModel: {
-          lists: { foo: 'bar' }
-        },
-        stores: {
-          lists: listStore
-        }
-      }, err => {
-        assert.that(err).is.not.null();
-        assert.that(err.message).is.equalTo('Error from list store.');
-        done();
-      });
+      await assert.that(async () => {
+        await modelStore.initialize({
+          application: 'foo',
+          eventSequencer,
+          readModel: {
+            lists: { foo: 'bar' }
+          },
+          stores: {
+            lists: listStore
+          }
+        });
+      }).is.throwingAsync('Error from list store.');
     });
   });
 
@@ -207,65 +174,51 @@ suite('ModelStore', () => {
       modelStore = new ModelStore();
     });
 
-    test('is a function.', done => {
+    test('is a function.', async () => {
       assert.that(modelStore.processEvents).is.ofType('function');
-      done();
     });
 
-    test('throws an error if domain event is missing.', done => {
-      assert.that(() => {
-        modelStore.processEvents();
-      }).is.throwing('Domain event is missing.');
-      done();
+    test('throws an error if domain event is missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.processEvents();
+      }).is.throwingAsync('Domain event is missing.');
     });
 
-    test('throws an error if model events are missing.', done => {
-      assert.that(() => {
-        modelStore.processEvents(domainEvent);
-      }).is.throwing('Model events are missing.');
-      done();
+    test('throws an error if model events are missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.processEvents(domainEvent);
+      }).is.throwingAsync('Model events are missing.');
     });
 
-    test('throws an error if callback is missing.', done => {
-      assert.that(() => {
-        modelStore.processEvents(domainEvent, []);
-      }).is.throwing('Callback is missing.');
-      done();
-    });
-
-    test('handles store specific events in each store.', done => {
+    test('handles store specific events in each store.', async () => {
       const listStore = {
         items: [],
-        initialize (options, callback) {
+        async initialize () {
           eventSequencer.registerModel({ type: 'lists', name: 'peerGroups', lastProcessedPosition: 0 });
-          callback(null);
         },
-        added (options, callback) {
+        async added (options) {
           this.items.push(options.payload);
-          callback(null);
         },
-        updatePosition (position, callback) {
-          callback(null);
+        async updatePosition () {
+          // Intentionally left blank.
         },
         on () {}
       };
       const treeStore = {
         items: [],
-        initialize (options, callback) {
+        async initialize () {
           eventSequencer.registerModel({ type: 'trees', name: 'peerGroups', lastProcessedPosition: 0 });
-          callback(null);
         },
-        added (options, callback) {
+        async added (options) {
           this.items.push(options.payload);
-          callback(null);
         },
-        updatePosition (position, callback) {
-          callback(null);
+        async updatePosition () {
+          // Intentionally left blank.
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {},
@@ -273,149 +226,130 @@ suite('ModelStore', () => {
           lists: listStore,
           trees: treeStore
         }
-      }, err => {
-        assert.that(err).is.null();
-
-        const modelEvents = [
-          buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
-          buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
-          buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
-          buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }})
-        ];
-
-        modelStore.processEvents(domainEvent, modelEvents, errProcessEvents => {
-          assert.that(errProcessEvents).is.null();
-          assert.that(listStore.items).is.equalTo([
-            { value: 1 },
-            { value: 2 }
-          ]);
-          assert.that(treeStore.items).is.equalTo([
-            { value: 3 },
-            { value: 4 }
-          ]);
-          done();
-        });
       });
+
+      const modelEvents = [
+        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
+        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
+        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
+        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }})
+      ];
+
+      await modelStore.processEvents(domainEvent, modelEvents);
+
+      assert.that(listStore.items).is.equalTo([
+        { value: 1 },
+        { value: 2 }
+      ]);
+      assert.that(treeStore.items).is.equalTo([
+        { value: 3 },
+        { value: 4 }
+      ]);
     });
 
-    test('ignores events for non-existent stores.', done => {
+    test('ignores events for non-existent stores.', async () => {
       const listStore = {
         items: [],
-        initialize (options, callback) {
+        async initialize () {
           eventSequencer.registerModel({ type: 'lists', name: 'peerGroups', lastProcessedPosition: 0 });
-          callback(null);
         },
-        added (options, callback) {
+        async added (options) {
           this.items.push(options.payload);
-          callback(null);
         },
-        updatePosition (position, callback) {
-          callback(null);
+        async updatePosition () {
+          // Intentionally left blank.
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {},
         stores: {
           lists: listStore
         }
-      }, err => {
-        assert.that(err).is.null();
-
-        const modelEvents = [
-          buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
-          buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
-          buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
-          buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }})
-        ];
-
-        modelStore.processEvents(domainEvent, modelEvents, errProcessEvents => {
-          assert.that(errProcessEvents).is.null();
-          assert.that(listStore.items).is.equalTo([
-            { value: 1 },
-            { value: 2 }
-          ]);
-          done();
-        });
       });
+
+      const modelEvents = [
+        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
+        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
+        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
+        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }})
+      ];
+
+      await modelStore.processEvents(domainEvent, modelEvents);
+
+      assert.that(listStore.items).is.equalTo([
+        { value: 1 },
+        { value: 2 }
+      ]);
     });
 
-    test('skips events for models that have already processed the event.', done => {
+    test('skips events for models that have already processed the event.', async () => {
       const listStore = {
         items: [],
-        initialize (options, callback) {
+        async initialize () {
           eventSequencer.registerModel({ type: 'lists', name: 'peerGroups', lastProcessedPosition: 0 });
           eventSequencer.registerModel({ type: 'lists', name: 'tasteMakers', lastProcessedPosition: 1 });
-          callback(null);
         },
-        added (options, callback) {
+        async added (options) {
           this.items.push(options.modelName);
-          callback(null);
         },
-        updatePosition (position, callback) {
-          callback(null);
+        async updatePosition () {
+          // Intentionally left blank.
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {},
         stores: {
           lists: listStore
         }
-      }, err => {
-        assert.that(err).is.null();
-
-        const modelEvents = [
-          buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
-          buildModelEvent('lists', 'tasteMakers', 'added', { payload: { value: 1 }})
-        ];
-
-        modelStore.processEvents(domainEvent, modelEvents, errProcessEvents => {
-          assert.that(errProcessEvents).is.null();
-          assert.that(listStore.items.length).is.equalTo(1);
-          assert.that(listStore.items[0]).is.equalTo('peerGroups');
-          done();
-        });
       });
+
+      const modelEvents = [
+        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
+        buildModelEvent('lists', 'tasteMakers', 'added', { payload: { value: 1 }})
+      ];
+
+      await modelStore.processEvents(domainEvent, modelEvents);
+
+      assert.that(listStore.items.length).is.equalTo(1);
+      assert.that(listStore.items[0]).is.equalTo('peerGroups');
     });
 
-    test('returns an error if a store fails.', done => {
+    test('returns an error if a store fails.', async () => {
       const listStore = {
         items: [],
-        initialize (options, callback) {
+        async initialize () {
           eventSequencer.registerModel({ type: 'lists', name: 'peerGroups', lastProcessedPosition: 0 });
-          callback(null);
         },
-        added (options, callback) {
+        async added (options) {
           this.items.push(options.payload);
-          callback(null);
         },
-        updatePosition (position, callback) {
-          callback(null);
+        async updatePosition () {
+          // Intentionally left blank.
         },
         on () {}
       };
       const treeStore = {
-        initialize (options, callback) {
+        async initialize () {
           eventSequencer.registerModel({ type: 'trees', name: 'peerGroups', lastProcessedPosition: 0 });
-          callback(null);
         },
-        added (options, callback) {
-          callback(new Error('Error from tree store.'));
+        async added () {
+          throw new Error('Error from tree store.');
         },
-        updatePosition (position, callback) {
-          callback(null);
+        async updatePosition () {
+          // Intentionally left blank.
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {},
@@ -423,22 +357,18 @@ suite('ModelStore', () => {
           lists: listStore,
           trees: treeStore
         }
-      }, err => {
-        assert.that(err).is.null();
-
-        const modelEvents = [
-          buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
-          buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
-          buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
-          buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }})
-        ];
-
-        modelStore.processEvents(domainEvent, modelEvents, errProcessEvents => {
-          assert.that(errProcessEvents).is.not.null();
-          assert.that(errProcessEvents.message).is.equalTo('Error from tree store.');
-          done();
-        });
       });
+
+      const modelEvents = [
+        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
+        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
+        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
+        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }})
+      ];
+
+      await assert.that(async () => {
+        await modelStore.processEvents(domainEvent, modelEvents);
+      }).is.throwingAsync('Error from tree store.');
     });
   });
 
@@ -449,141 +379,114 @@ suite('ModelStore', () => {
       modelStore = new ModelStore();
     });
 
-    test('is a function.', done => {
+    test('is a function.', async () => {
       assert.that(modelStore.read).is.ofType('function');
-      done();
     });
 
-    test('throws an error if options are missing.', done => {
-      assert.that(() => {
-        modelStore.read();
-      }).is.throwing('Options are missing.');
-      done();
+    test('throws an error if model type is missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.read({});
+      }).is.throwingAsync('Model type is missing.');
     });
 
-    test('throws an error if model type is missing.', done => {
-      assert.that(() => {
-        modelStore.read({});
-      }).is.throwing('Model type is missing.');
-      done();
+    test('throws an error if model name is missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.read({ modelType: 'lists' });
+      }).is.throwingAsync('Model name is missing.');
     });
 
-    test('throws an error if model name is missing.', done => {
-      assert.that(() => {
-        modelStore.read({ modelType: 'lists' });
-      }).is.throwing('Model name is missing.');
-      done();
-    });
-
-    test('throws an error if callback is missing.', done => {
-      assert.that(() => {
-        modelStore.read({ modelType: 'lists', modelName: 'peerGroups' });
-      }).is.throwing('Callback is missing.');
-      done();
-    });
-
-    test('calls read on the appropriate store.', done => {
+    test('calls read on the appropriate store.', async () => {
       const listStore = {
         options: undefined,
-        initialize (options, callback) {
-          callback(null);
+        async initialize () {
+          // Intentionally left blank.
         },
-        read (options, callback) {
+        async read (options) {
           this.options = options;
-          callback(null, 'this should be a stream');
+
+          return 'this should be a stream';
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {},
         stores: {
           lists: listStore
         }
-      }, errInitialize => {
-        assert.that(errInitialize).is.null();
+      });
 
-        modelStore.read({
-          modelType: 'lists',
-          modelName: 'peerGroups',
-          query: {
-            where: { foo: 'bar' }
-          }
-        }, (errRead, peerGroups) => {
-          assert.that(errRead).is.null();
-          assert.that(peerGroups).is.equalTo('this should be a stream');
-          assert.that(listStore.options).is.equalTo({
-            modelType: 'lists',
-            modelName: 'peerGroups',
-            query: {
-              where: { foo: 'bar' }
-            }
-          });
-          done();
-        });
+      const peerGroups = await modelStore.read({
+        modelType: 'lists',
+        modelName: 'peerGroups',
+        query: {
+          where: { foo: 'bar' }
+        }
+      });
+
+      assert.that(peerGroups).is.equalTo('this should be a stream');
+      assert.that(listStore.options).is.equalTo({
+        modelType: 'lists',
+        modelName: 'peerGroups',
+        query: {
+          where: { foo: 'bar' }
+        }
       });
     });
 
-    test('sets a default query if no query is given.', done => {
+    test('sets a default query if no query is given.', async () => {
       const listStore = {
         options: undefined,
-        initialize (options, callback) {
-          callback(null);
+        async initialize () {
+          // Intentionally left blank.
         },
-        read (options, callback) {
+        async read (options) {
           this.options = options;
-          callback(null, 'this should be a stream');
+
+          return 'this should be a stream';
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {},
         stores: {
           lists: listStore
         }
-      }, errInitialize => {
-        assert.that(errInitialize).is.null();
-
-        modelStore.read({ modelType: 'lists', modelName: 'peerGroups' }, errRead => {
-          assert.that(errRead).is.null();
-          assert.that(listStore.options.query).is.equalTo({});
-          done();
-        });
       });
+
+      await modelStore.read({ modelType: 'lists', modelName: 'peerGroups' });
+
+      assert.that(listStore.options.query).is.equalTo({});
     });
 
-    test('forwards errors from the store.', done => {
+    test('forwards errors from the store.', async () => {
       const listStore = {
-        initialize (options, callback) {
-          callback(null);
+        async initialize () {
+          // Intentionally left blank.
         },
-        read (options, callback) {
-          callback(new Error('Error from list store.'));
+        async read () {
+          throw new Error('Error from list store.');
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {},
         stores: {
           lists: listStore
         }
-      }, errInitialize => {
-        assert.that(errInitialize).is.null();
-
-        modelStore.read({ modelType: 'lists', modelName: 'peerGroups' }, errRead => {
-          assert.that(errRead).is.not.null();
-          assert.that(errRead.message).is.equalTo('Error from list store.');
-          done();
-        });
       });
+
+      await assert.that(async () => {
+        await modelStore.read({ modelType: 'lists', modelName: 'peerGroups' });
+      }).is.throwingAsync('Error from list store.');
     });
   });
 
@@ -594,61 +497,41 @@ suite('ModelStore', () => {
       modelStore = new ModelStore();
     });
 
-    test('is a function.', done => {
+    test('is a function.', async () => {
       assert.that(modelStore.readOne).is.ofType('function');
-      done();
     });
 
-    test('throws an error if options are missing.', done => {
-      assert.that(() => {
-        modelStore.readOne();
-      }).is.throwing('Options are missing.');
-      done();
+    test('throws an error if model type is missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.readOne({});
+      }).is.throwingAsync('Model type is missing.');
     });
 
-    test('throws an error if model type is missing.', done => {
-      assert.that(() => {
-        modelStore.readOne({});
-      }).is.throwing('Model type is missing.');
-      done();
+    test('throws an error if model name is missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.readOne({ modelType: 'lists' });
+      }).is.throwingAsync('Model name is missing.');
     });
 
-    test('throws an error if model name is missing.', done => {
-      assert.that(() => {
-        modelStore.readOne({ modelType: 'lists' });
-      }).is.throwing('Model name is missing.');
-      done();
+    test('throws an error if query is missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.readOne({ modelType: 'lists', modelName: 'peerGroups' });
+      }).is.throwingAsync('Query is missing.');
     });
 
-    test('throws an error if query is missing.', done => {
-      assert.that(() => {
-        modelStore.readOne({ modelType: 'lists', modelName: 'peerGroups' });
-      }).is.throwing('Query is missing.');
-      done();
+    test('throws an error if where is missing.', async () => {
+      await assert.that(async () => {
+        await modelStore.readOne({ modelType: 'lists', modelName: 'peerGroups', query: {}});
+      }).is.throwingAsync('Where is missing.');
     });
 
-    test('throws an error if where is missing.', done => {
-      assert.that(() => {
-        modelStore.readOne({ modelType: 'lists', modelName: 'peerGroups', query: {}});
-      }).is.throwing('Where is missing.');
-      done();
-    });
-
-    test('throws an error if callback is missing.', done => {
-      assert.that(() => {
-        modelStore.readOne({ modelType: 'lists', modelName: 'peerGroups', query: { where: {}}});
-      }).is.throwing('Callback is missing.');
-      done();
-    });
-
-    test('returns the first found item.', done => {
+    test('returns the first found item.', async () => {
       const listStore = {
         options: undefined,
-        initialize (options, callback) {
+        async initialize () {
           eventSequencer.registerModel({ type: 'lists', name: 'peerGroups', lastProcessedPosition: 0 });
-          callback(null);
         },
-        read (options, callback) {
+        async read (options) {
           this.options = options;
 
           const passThrough = new PassThrough({ objectMode: true });
@@ -657,116 +540,102 @@ suite('ModelStore', () => {
           passThrough.write('this is another item');
           passThrough.end();
 
-          callback(null, passThrough);
+          return passThrough;
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {},
         stores: {
           lists: listStore
         }
-      }, errInitialize => {
-        assert.that(errInitialize).is.null();
+      });
 
-        modelStore.readOne({
-          modelType: 'lists',
-          modelName: 'peerGroups',
-          query: { where: { foo: 'bar' }}
-        }, (errRead, item) => {
-          assert.that(errRead).is.null();
-          assert.that(item).is.equalTo('this should be an item');
-          assert.that(listStore.options).is.equalTo({
-            modelType: 'lists',
-            modelName: 'peerGroups',
-            query: {
-              where: { foo: 'bar' },
-              take: 1
-            }
-          });
-          done();
-        });
+      const item = await modelStore.readOne({
+        modelType: 'lists',
+        modelName: 'peerGroups',
+        query: { where: { foo: 'bar' }}
+      });
+
+      assert.that(item).is.equalTo('this should be an item');
+      assert.that(listStore.options).is.equalTo({
+        modelType: 'lists',
+        modelName: 'peerGroups',
+        query: {
+          where: { foo: 'bar' },
+          take: 1
+        }
       });
     });
 
-    test('returns an error if no item matches the query.', done => {
+    test('returns an error if no item matches the query.', async () => {
       const listStore = {
         options: undefined,
-        initialize (options, callback) {
+        async initialize () {
           eventSequencer.registerModel({ type: 'lists', name: 'peerGroups', lastProcessedPosition: 0 });
-          callback(null);
         },
-        read (options, callback) {
+        async read (options) {
           this.options = options;
 
           const passThrough = new PassThrough();
 
           passThrough.end();
 
-          callback(null, passThrough);
+          return passThrough;
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {},
         stores: {
           lists: listStore
         }
-      }, errInitialize => {
-        assert.that(errInitialize).is.null();
+      });
 
-        modelStore.readOne({
+      await assert.that(async () => {
+        await modelStore.readOne({
           modelType: 'lists',
           modelName: 'peerGroups',
           query: { where: { foo: 'bar' }}
-        }, errRead => {
-          assert.that(errRead).is.not.null();
-          assert.that(errRead.message).is.equalTo('Item not found.');
-          done();
         });
-      });
+      }).is.throwingAsync('Item not found.');
     });
 
-    test('forwards errors from the store.', done => {
+    test('forwards errors from the store.', async () => {
       const listStore = {
-        initialize (options, callback) {
+        async initialize () {
           eventSequencer.registerModel({ type: 'lists', name: 'peerGroups', lastProcessedPosition: 0 });
-          callback(null);
         },
-        read (options, callback) {
-          callback(new Error('Error from list store.'));
+        async read () {
+          throw new Error('Error from list store.');
         },
         on () {}
       };
 
-      modelStore.initialize({
+      await modelStore.initialize({
         application: 'foo',
         eventSequencer,
         readModel: {},
         stores: {
           lists: listStore
         }
-      }, errInitialize => {
-        assert.that(errInitialize).is.null();
+      });
 
-        modelStore.readOne({
+      await assert.that(async () => {
+        await modelStore.readOne({
           modelType: 'lists',
           modelName: 'peerGroups',
           query: {
             where: { foo: 'bar' }
           }
-        }, errRead => {
-          assert.that(errRead).is.not.null();
-          assert.that(errRead.message).is.equalTo('Error from list store.');
-          done();
         });
-      });
+      }).is.throwingAsync('Error from list store.');
     });
   });
 });

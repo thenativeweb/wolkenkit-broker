@@ -121,15 +121,13 @@ class ModelStore extends EventEmitter {
     })));
   }
 
-  async read ({ modelType, modelName, query }) {
+  async read ({ modelType, modelName, query = {}}) {
     if (!modelType) {
       throw new Error('Model type is missing.');
     }
     if (!modelName) {
       throw new Error('Model name is missing.');
     }
-
-    query = query || {};
 
     const stream = await this.stores[modelType].read({ modelType, modelName, query });
 

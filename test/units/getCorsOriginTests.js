@@ -5,51 +5,44 @@ const assert = require('assertthat');
 const getCorsOrigin = require('../../getCorsOrigin');
 
 suite('getCorsOrigin', () => {
-  test('is a function.', done => {
+  test('is a function.', async () => {
     assert.that(getCorsOrigin).is.ofType('function');
-    done();
   });
 
-  test('throws an error if value is missing.', done => {
+  test('throws an error if value is missing.', async () => {
     assert.that(() => {
       getCorsOrigin();
     }).is.throwing('Value is missing.');
-    done();
   });
 
-  test('returns * if * is given.', done => {
+  test('returns * if * is given.', async () => {
     assert.that(getCorsOrigin('*')).is.equalTo('*');
-    done();
   });
 
-  test('returns an array with one item if a single value is given.', done => {
+  test('returns an array with one item if a single value is given.', async () => {
     assert.that(getCorsOrigin('http://www.thenativeweb.io')).is.equalTo([
       'http://www.thenativeweb.io'
     ]);
-    done();
   });
 
-  test('returns an array with multiple items if multiple values are given.', done => {
+  test('returns an array with multiple items if multiple values are given.', async () => {
     assert.that(getCorsOrigin([ 'http://www.thenativeweb.io', 'http://www.example.com' ])).is.equalTo([
       'http://www.thenativeweb.io',
       'http://www.example.com'
     ]);
-    done();
   });
 
-  test('supports regular expressions.', done => {
+  test('supports regular expressions.', async () => {
     assert.that(getCorsOrigin([ 'http://www.thenativeweb.io', '/\\.thenativeweb\\.io$/' ])).is.equalTo([
       'http://www.thenativeweb.io',
       /\.thenativeweb\.io$/
     ]);
-    done();
   });
 
-  test('trims whitespace.', done => {
+  test('trims whitespace.', async () => {
     assert.that(getCorsOrigin([ ' http://www.thenativeweb.io   ', '  /\\.thenativeweb\\.io$/  ' ])).is.equalTo([
       'http://www.thenativeweb.io',
       /\.thenativeweb\.io$/
     ]);
-    done();
   });
 });

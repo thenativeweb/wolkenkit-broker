@@ -7,7 +7,7 @@ const fields = {
 };
 
 const when = {
-  'planning.peerGroup.started': (peerGroups, event) => {
+  'planning.peerGroup.started' (peerGroups, event) {
     peerGroups.add({
       initiator: event.data.initiator,
       destination: event.data.destination,
@@ -15,7 +15,7 @@ const when = {
     });
   },
 
-  'planning.peerGroup.joined': (peerGroups, event) => {
+  'planning.peerGroup.joined' (peerGroups, event) {
     peerGroups.update({
       where: { id: event.aggregate.id },
       set: {
@@ -24,7 +24,7 @@ const when = {
     });
   },
 
-  'planning.peerGroup.left': (peerGroups, event) => {
+  'planning.peerGroup.left' (peerGroups, event) {
     peerGroups.update({
       where: { id: event.aggregate.id },
       set: {

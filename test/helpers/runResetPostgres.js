@@ -1,6 +1,6 @@
 'use strict';
 
-const parse = require('pg-connection-string').parse,
+const { parse } = require('pg-connection-string'),
       pg = require('pg'),
       processenv = require('processenv');
 

@@ -1,7 +1,7 @@
 'use strict';
 
 const async = require('async'),
-      MongoClient = require('mongodb').MongoClient,
+      { MongoClient } = require('mongodb'),
       processenv = require('processenv');
 
 const url = processenv('URL');

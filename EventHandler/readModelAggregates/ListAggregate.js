@@ -7,15 +7,12 @@ const { Event } = require('commands-events'),
       uuid = require('uuidv4');
 
 class Readable {
-  constructor ({ readModel, modelStore, modelType, modelName }) {
+  constructor ({ readModel, modelStore, modelName }) {
     if (!readModel) {
       throw new Error('Read model is missing.');
     }
     if (!modelStore) {
       throw new Error('Model store is missing.');
-    }
-    if (!modelType) {
-      throw new Error('Model type is missing.');
     }
     if (!modelName) {
       throw new Error('Model name is missing.');
@@ -23,13 +20,11 @@ class Readable {
 
     this.readModel = readModel;
     this.modelStore = modelStore;
-    this.modelType = modelType;
+    this.modelType = 'lists';
     this.modelName = modelName;
   }
 
-  async read (query) {
-    query = query || {};
-
+  async read (query = {}) {
     const stream = await this.modelStore.read({
       modelType: this.modelType,
       modelName: this.modelName,
@@ -60,18 +55,18 @@ class Readable {
 }
 
 class Writable extends Readable {
-  constructor (options) {
-    super(options);
+  constructor ({ readModel, modelStore, modelName, domainEvent, uncommittedEvents }) {
+    super({ readModel, modelStore, modelName });
 
-    if (!options.domainEvent) {
+    if (!domainEvent) {
       throw new Error('Domain event is missing.');
     }
-    if (!options.uncommittedEvents) {
+    if (!uncommittedEvents) {
       throw new Error('Uncommitted events are missing.');
     }
 
-    this.domainEvent = options.domainEvent;
-    this.uncommittedEvents = options.uncommittedEvents;
+    this.domainEvent = domainEvent;
+    this.uncommittedEvents = uncommittedEvents;
   }
 
   publishEvent (name, data) {

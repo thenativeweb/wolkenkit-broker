@@ -1,10 +1,8 @@
 'use strict';
 
-const stream = require('stream');
+const { PassThrough } = require('stream');
 
 const getEventHandlingStrategies = require('./getEventHandlingStrategies');
-
-const PassThrough = stream.PassThrough;
 
 const appLogic = function ({ app, eventSequencer, eventStore, modelStore, readModel }) {
   if (!app) {
@@ -42,7 +40,7 @@ const appLogic = function ({ app, eventSequencer, eventStore, modelStore, readMo
   });
 
   app.api.read = async function (modelType, modelName, { where, orderBy, skip, take }) {
-    const incomingStream = modelStore.read({
+    const incomingStream = await modelStore.read({
       modelType,
       modelName,
       query: {

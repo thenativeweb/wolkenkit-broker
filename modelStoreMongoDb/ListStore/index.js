@@ -56,10 +56,7 @@ class ListStore extends EventEmitter {
       const collection = await db.collection(`${application}_model_list_${modelName}`);
 
       this.collections[modelName] = collection;
-    }
 
-    for (let i = 0; i < this.modelNames.length; i++) {
-      const modelName = this.modelNames[i];
       const fields = cloneDeep(readModel[modelName].fields);
 
       fields.id = { fastLookup: true, isUnique: true };
@@ -180,7 +177,7 @@ class ListStore extends EventEmitter {
       translatedSelector = translate.selector(query.where);
     }
 
-    let cursor = await this.collections[modelName].find(translatedSelector);
+    let cursor = this.collections[modelName].find(translatedSelector);
 
     if (query.orderBy) {
       cursor = cursor.sort(translate.orderBy(query.orderBy));

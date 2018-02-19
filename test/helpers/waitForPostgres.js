@@ -1,10 +1,10 @@
 'use strict';
 
-const parse = require('pg-connection-string').parse,
+const { parse } = require('pg-connection-string'),
       pg = require('pg'),
       retry = require('retry');
 
-const waitForPostgres = function (options, callback) {
+const waitForPostgres = async function (options) {
   if (!options) {
     throw new Error('Options are missing.');
   }
@@ -17,21 +17,23 @@ const waitForPostgres = function (options, callback) {
   const operation = retry.operation();
   const pool = new pg.Pool(parse(url));
 
-  operation.attempt(() => {
-    pool.connect((err, db, done) => {
-      if (operation.retry(err)) {
-        return;
-      }
+  await new Promise((resolve, reject) => {
+    operation.attempt(() => {
+      pool.connect((err, db, done) => {
+        if (operation.retry(err)) {
+          return;
+        }
 
-      if (err) {
-        return callback(operation.mainError());
-      }
+        if (err) {
+          return reject(operation.mainError());
+        }
 
-      /* eslint-disable callback-return */
-      pool.end();
-      done();
-      callback(null);
-      /* eslint-enable callback-return */
+        /* eslint-disable callback-return */
+        pool.end();
+        done();
+        resolve(null);
+        /* eslint-enable callback-return */
+      });
     });
   });
 };

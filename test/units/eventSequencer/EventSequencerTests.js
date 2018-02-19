@@ -6,16 +6,14 @@ const buildEvent = require('../../helpers/buildEvent'),
       EventSequencer = require('../../../eventSequencer/EventSequencer');
 
 suite('EventSequencer', () => {
-  test('is a function.', done => {
+  test('is a function.', async () => {
     assert.that(EventSequencer).is.ofType('function');
-    done();
   });
 
-  test('initializes with empty models.', done => {
+  test('initializes with empty models.', async () => {
     const eventSequencer = new EventSequencer();
 
     assert.that(eventSequencer.models).is.equalTo({});
-    done();
   });
 
   suite('registerModel', () => {
@@ -25,49 +23,38 @@ suite('EventSequencer', () => {
       eventSequencer = new EventSequencer();
     });
 
-    test('is a function.', done => {
+    test('is a function.', async () => {
       assert.that(eventSequencer.registerModel).is.ofType('function');
-      done();
     });
 
-    test('throws an error if options are missing.', done => {
-      assert.that(() => {
-        eventSequencer.registerModel();
-      }).is.throwing('Options are missing.');
-      done();
-    });
-
-    test('throws an error if name is missing.', done => {
+    test('throws an error if name is missing.', async () => {
       assert.that(() => {
         eventSequencer.registerModel({
           type: 'lists',
           lastProcessedPosition: 23
         });
       }).is.throwing('Name is missing.');
-      done();
     });
 
-    test('throws an error if type is missing.', done => {
+    test('throws an error if type is missing.', async () => {
       assert.that(() => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           lastProcessedPosition: 23
         });
       }).is.throwing('Type is missing.');
-      done();
     });
 
-    test('throws an error if last processed position is missing.', done => {
+    test('throws an error if last processed position is missing.', async () => {
       assert.that(() => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists'
         });
       }).is.throwing('Last processed position is missing.');
-      done();
     });
 
-    test('registers the given model.', done => {
+    test('registers the given model.', async () => {
       eventSequencer.registerModel({
         name: 'peerGroups',
         type: 'lists',
@@ -79,10 +66,9 @@ suite('EventSequencer', () => {
           peerGroups: { lastProcessedPosition: 23 }
         }
       });
-      done();
     });
 
-    test('registers the given model even with 0 as last processed position.', done => {
+    test('registers the given model even with 0 as last processed position.', async () => {
       eventSequencer.registerModel({
         name: 'peerGroups',
         type: 'lists',
@@ -94,10 +80,9 @@ suite('EventSequencer', () => {
           peerGroups: { lastProcessedPosition: 0 }
         }
       });
-      done();
     });
 
-    test('throws an error if a model is registered twice.', done => {
+    test('throws an error if a model is registered twice.', async () => {
       eventSequencer.registerModel({
         name: 'peerGroups',
         type: 'lists',
@@ -111,7 +96,6 @@ suite('EventSequencer', () => {
           lastProcessedPosition: 42
         });
       }).is.throwing('Model had already been registered.');
-      done();
     });
   });
 
@@ -122,49 +106,38 @@ suite('EventSequencer', () => {
       eventSequencer = new EventSequencer();
     });
 
-    test('is a function.', done => {
+    test('is a function.', async () => {
       assert.that(eventSequencer.updatePosition).is.ofType('function');
-      done();
     });
 
-    test('throws an error if options are missing.', done => {
-      assert.that(() => {
-        eventSequencer.updatePosition();
-      }).is.throwing('Options are missing.');
-      done();
-    });
-
-    test('throws an error if name is missing.', done => {
+    test('throws an error if name is missing.', async () => {
       assert.that(() => {
         eventSequencer.updatePosition({
           type: 'lists',
           position: 23
         });
       }).is.throwing('Name is missing.');
-      done();
     });
 
-    test('throws an error if type is missing.', done => {
+    test('throws an error if type is missing.', async () => {
       assert.that(() => {
         eventSequencer.updatePosition({
           name: 'peerGroups',
           position: 23
         });
       }).is.throwing('Type is missing.');
-      done();
     });
 
-    test('throws an error if position is missing.', done => {
+    test('throws an error if position is missing.', async () => {
       assert.that(() => {
         eventSequencer.updatePosition({
           name: 'peerGroups',
           type: 'lists'
         });
       }).is.throwing('Position is missing.');
-      done();
     });
 
-    test('throws an error if the given model type does not exist.', done => {
+    test('throws an error if the given model type does not exist.', async () => {
       eventSequencer.registerModel({
         name: 'peerGroups',
         type: 'lists',
@@ -178,10 +151,9 @@ suite('EventSequencer', () => {
           position: 23
         });
       }).is.throwing('Model type does not exist.');
-      done();
     });
 
-    test('throws an error if the given model name does not exist.', done => {
+    test('throws an error if the given model name does not exist.', async () => {
       eventSequencer.registerModel({
         name: 'peerGroups',
         type: 'lists',
@@ -195,10 +167,9 @@ suite('EventSequencer', () => {
           position: 23
         });
       }).is.throwing('Model name does not exist.');
-      done();
     });
 
-    test('updates the given model.', done => {
+    test('updates the given model.', async () => {
       eventSequencer.registerModel({
         name: 'peerGroups',
         type: 'lists',
@@ -216,10 +187,9 @@ suite('EventSequencer', () => {
           peerGroups: { lastProcessedPosition: 24 }
         }
       });
-      done();
     });
 
-    test('throws an error if the given position is less than the last processed position.', done => {
+    test('throws an error if the given position is less than the last processed position.', async () => {
       eventSequencer.registerModel({
         name: 'peerGroups',
         type: 'lists',
@@ -233,10 +203,9 @@ suite('EventSequencer', () => {
           position: 22
         });
       }).is.throwing('Position is not greater than last processed position.');
-      done();
     });
 
-    test('throws an error if the given position is equal to the last processed position.', done => {
+    test('throws an error if the given position is equal to the last processed position.', async () => {
       eventSequencer.registerModel({
         name: 'peerGroups',
         type: 'lists',
@@ -250,7 +219,6 @@ suite('EventSequencer', () => {
           position: 23
         });
       }).is.throwing('Position is not greater than last processed position.');
-      done();
     });
   });
 
@@ -267,20 +235,18 @@ suite('EventSequencer', () => {
       });
     });
 
-    test('is a function.', done => {
+    test('is a function.', async () => {
       assert.that(eventSequencer.getStrategyFor).is.ofType('function');
-      done();
     });
 
-    test('throws an error if event is missing.', done => {
+    test('throws an error if event is missing.', async () => {
       assert.that(() => {
         eventSequencer.getStrategyFor();
       }).is.throwing('Event is missing.');
-      done();
     });
 
     suite('returns forward strategy', () => {
-      test('if position is missing.', done => {
+      test('if position is missing.', async () => {
         Reflect.deleteProperty(eventStarted.metadata, 'position');
 
         const strategy = eventSequencer.getStrategyFor(eventStarted);
@@ -288,12 +254,11 @@ suite('EventSequencer', () => {
         assert.that(strategy).is.equalTo({
           type: 'forward'
         });
-        done();
       });
     });
 
     suite('returns replay strategy', () => {
-      test('if events have been lost of the single model.', done => {
+      test('if events have been lost of the single model.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -309,10 +274,9 @@ suite('EventSequencer', () => {
           fromPosition: 24,
           toPosition: 42
         });
-        done();
       });
 
-      test('if events have been lost of all models.', done => {
+      test('if events have been lost of all models.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -333,10 +297,9 @@ suite('EventSequencer', () => {
           fromPosition: 24,
           toPosition: 42
         });
-        done();
       });
 
-      test('if different events have been lost of all models.', done => {
+      test('if different events have been lost of all models.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -357,10 +320,9 @@ suite('EventSequencer', () => {
           fromPosition: 24,
           toPosition: 42
         });
-        done();
       });
 
-      test('if events have been lost of some models.', done => {
+      test('if events have been lost of some models.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -381,10 +343,9 @@ suite('EventSequencer', () => {
           fromPosition: 24,
           toPosition: 42
         });
-        done();
       });
 
-      test('for new models.', done => {
+      test('for new models.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -400,12 +361,11 @@ suite('EventSequencer', () => {
           fromPosition: 1,
           toPosition: 42
         });
-        done();
       });
     });
 
     suite('returns skip strategy', () => {
-      test('if the event is the last processed event of the single model.', done => {
+      test('if the event is the last processed event of the single model.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -417,10 +377,9 @@ suite('EventSequencer', () => {
         const strategy = eventSequencer.getStrategyFor(eventStarted);
 
         assert.that(strategy).is.equalTo({ type: 'skip' });
-        done();
       });
 
-      test('if the event is a predecessor of the last processed event of the single model.', done => {
+      test('if the event is a predecessor of the last processed event of the single model.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -432,10 +391,9 @@ suite('EventSequencer', () => {
         const strategy = eventSequencer.getStrategyFor(eventStarted);
 
         assert.that(strategy).is.equalTo({ type: 'skip' });
-        done();
       });
 
-      test('if the event is the last processed events of all models.', done => {
+      test('if the event is the last processed events of all models.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -452,10 +410,9 @@ suite('EventSequencer', () => {
         const strategy = eventSequencer.getStrategyFor(eventStarted);
 
         assert.that(strategy).is.equalTo({ type: 'skip' });
-        done();
       });
 
-      test('if the event is a predecessor of the last processed events of all models.', done => {
+      test('if the event is a predecessor of the last processed events of all models.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -472,12 +429,11 @@ suite('EventSequencer', () => {
         const strategy = eventSequencer.getStrategyFor(eventStarted);
 
         assert.that(strategy).is.equalTo({ type: 'skip' });
-        done();
       });
     });
 
     suite('returns proceed strategy', () => {
-      test('if the event is the successor of the last processed event of the single model.', done => {
+      test('if the event is the successor of the last processed event of the single model.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -489,10 +445,9 @@ suite('EventSequencer', () => {
         const strategy = eventSequencer.getStrategyFor(eventStarted);
 
         assert.that(strategy).is.equalTo({ type: 'proceed' });
-        done();
       });
 
-      test('if the event is the successor of the last processed events of all models.', done => {
+      test('if the event is the successor of the last processed events of all models.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -509,10 +464,9 @@ suite('EventSequencer', () => {
         const strategy = eventSequencer.getStrategyFor(eventStarted);
 
         assert.that(strategy).is.equalTo({ type: 'proceed' });
-        done();
       });
 
-      test('if the event is the successor of the last processed events of at least one model.', done => {
+      test('if the event is the successor of the last processed events of at least one model.', async () => {
         eventSequencer.registerModel({
           name: 'peerGroups',
           type: 'lists',
@@ -529,7 +483,6 @@ suite('EventSequencer', () => {
         const strategy = eventSequencer.getStrategyFor(eventStarted);
 
         assert.that(strategy).is.equalTo({ type: 'proceed' });
-        done();
       });
     });
   });

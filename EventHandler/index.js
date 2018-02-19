@@ -19,6 +19,8 @@ class EventHandler {
     this.readModel = readModel;
     this.modelStore = modelStore;
 
+    this.logger = app.services.getLogger();
+
     this.eventListeners = {};
 
     Object.keys(readModel).forEach(modelType => {
@@ -44,35 +46,36 @@ class EventHandler {
     const eventName = `${domainEvent.context.name}.${domainEvent.aggregate.name}.${domainEvent.name}`;
     const modelEvents = [];
 
+    // this check is new...before it was async.each(this.eventListeners[eventName]
     if (!this.eventListeners[eventName]) {
       return modelEvents;
     }
+
+    domainEvent.fail = function (reason) {
+      throw new Error(reason);
+    };
 
     for (let i = 0; i < this.eventListeners[eventName].length; i++) {
       const eventListener = this.eventListeners[eventName][i];
       const { modelType, modelName } = eventListener;
 
+      const { app, readModel, modelStore } = this;
+
       const readModelAggregate = createReadModelAggregate({
-        readModel: this.readModel[eventListener.modelType][eventListener.modelName],
-        modelStore: this.modelStore,
+        readModel: readModel[eventListener.modelType][eventListener.modelName],
+        modelStore,
         modelType,
         modelName,
         domainEvent
       });
 
-      domainEvent.failed = function (reason) {
-        // Should we use a custom Error here?
-        throw new Error(reason);
-      };
-
-      const { app, readModel, modelStore } = this;
       const services = getServices({ app, readModel, modelStore, modelType, modelName });
 
       try {
         await eventListener(readModelAggregate, domainEvent, services);
       } catch (ex) {
-        // Should we check for specific errors?
-        // and should we log this error with flaschenpost? (like wolkenkit-core does)
+        this.logger.debug('Failed to handle event.', { err: ex });
+
         throw ex;
       }
 
