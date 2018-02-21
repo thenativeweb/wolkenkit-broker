@@ -26,7 +26,6 @@
     "mongodb": "3.0.2",
     "mongodb-uri": "0.9.7",
     "processenv": "1.0.0",
-    "require-dir": "1.0.0",
     "sha1": "1.1.1",
     "sparbuch": "2.0.2",
     "streamtoarray": "1.0.0",
