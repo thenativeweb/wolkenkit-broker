@@ -1,9 +1,9 @@
 'use strict';
 
-const path = require('path');
+const path = require('path'),
+      util = require('util');
 
 const assert = require('assertthat'),
-      async = require('async'),
       EventStore = require('sparbuch/lib/postgres/Sparbuch'),
       hase = require('hase'),
       jsonLinesClient = require('json-lines-client'),
@@ -20,57 +20,59 @@ const buildCommand = require('../helpers/buildCommand'),
       waitForPostgres = require('../helpers/waitForPostgres'),
       waitForRabbitMq = require('../helpers/waitForRabbitMq');
 
+const sleep = util.promisify(setTimeout);
+
 const api = {};
 
-api.sendCommand = function (command, callback) {
-  request.
+api.sendCommand = async function (command) {
+  const res = await request.
     post('https://localhost:3000/v1/command').
-    send(command).
-    end(callback);
+    send(command);
+
+  return res;
 };
 
-api.subscribeToEvents = function (options) {
-  jsonLinesClient({
+api.subscribeToEvents = async function (options) {
+  const server = await jsonLinesClient({
     protocol: 'https',
     host: 'localhost',
     port: 3000,
     path: '/v1/events',
     body: {}
-  }, server => {
-    let onData,
-        onError;
-
-    const unsubscribe = function (callbackUnsubscribe) {
-      server.stream.removeListener('error', onError);
-      server.stream.removeListener('data', onData);
-      server.disconnect();
-      setTimeout(() => {
-        callbackUnsubscribe();
-      }, 0.5 * 1000);
-    };
-
-    onData = function (data) {
-      options.onData(data, unsubscribe);
-    };
-
-    onError = function (err) {
-      unsubscribe(() => {
-        if (options.onError) {
-          options.onError(err);
-        }
-      });
-    };
-
-    server.stream.on('data', onData);
-    server.stream.on('error', onError);
-
-    if (options.onConnect) {
-      options.onConnect();
-    }
   });
+
+  let onData,
+      onError;
+
+  const unsubscribe = async function () {
+    server.stream.removeListener('error', onError);
+    server.stream.removeListener('data', onData);
+    server.disconnect();
+
+    await sleep(0.5 * 1000);
+  };
+
+  onData = async function (data) {
+    await options.onData(data, unsubscribe);
+  };
+
+  onError = async function (err) {
+    await unsubscribe();
+
+    if (options.onError) {
+      await options.onError(err);
+    }
+  };
+
+  server.stream.on('data', onData);
+  server.stream.on('error', onError);
+
+  if (options.onConnect) {
+    await options.onConnect();
+  }
 };
 
-api.readModel = function (options, callback) {
+api.readModel = async function (options) {
   const query = {};
 
   if (options.query) {
@@ -84,50 +86,51 @@ api.readModel = function (options, callback) {
     query.skip = options.query.skip;
   }
 
-  jsonLinesClient({
+  const server = await jsonLinesClient({
     protocol: 'https',
     host: 'localhost',
     port: 3000,
     path: `/v1/read/${options.modelType}/${options.modelName}`,
     query,
     headers: options.headers || {}
-  }, server => {
+  });
+
+  const result = await new Promise(async (resolve, reject) => {
     let onData,
         onEnd,
         onError;
 
-    const result = [];
+    const records = [];
 
-    const unsubscribe = function (callbackUnsubscribe) {
+    const unsubscribe = async function () {
       server.stream.removeListener('data', onData);
       server.stream.removeListener('end', onEnd);
       server.stream.removeListener('error', onError);
       server.disconnect();
-      setTimeout(() => {
-        callbackUnsubscribe();
-      }, 0.5 * 1000);
+
+      await sleep(0.5 * 1000);
     };
 
     onData = function (data) {
-      result.push(data);
+      records.push(data);
     };
 
-    onEnd = function () {
-      unsubscribe(() => {
-        callback(null, result);
-      });
+    onEnd = async function () {
+      await unsubscribe();
+      resolve(records);
     };
 
-    onError = function (err) {
-      unsubscribe(() => {
-        callback(err);
-      });
+    onError = async function (err) {
+      await unsubscribe();
+      reject(err);
     };
 
     server.stream.on('data', onData);
     server.stream.on('end', onEnd);
     server.stream.on('error', onError);
   });
+
+  return result;
 };
 
 suite('integrationTests', function () {
@@ -142,241 +145,194 @@ suite('integrationTests', function () {
       mq,
       stopApp;
 
-  setup(done => {
+  setup(async () => {
     const app = path.join(__dirname, '..', '..', 'app.js');
 
-    async.series([
-      callback => {
-        eventStore = new EventStore();
-        eventStore.initialize({ url: env.POSTGRES_URL_INTEGRATION, namespace }, callback);
-      },
-      callback => {
-        hase.connect(env.RABBITMQ_URL_INTEGRATION, (err, messageQueue) => {
-          if (err) {
-            return callback(err);
-          }
-          mq = messageQueue;
-          callback();
-        });
-      },
-      callback => {
-        mq.worker('plcr::commands').createReadStream((err, commandStream) => {
-          if (err) {
-            return callback(err);
-          }
-          commandbus = commandStream;
-          callback(null);
-        });
-      },
-      callback => {
-        mq.publisher('plcr::events').createWriteStream((err, eventStream) => {
-          if (err) {
-            return callback(err);
-          }
-          eventbus = eventStream;
-          callback(null);
-        });
-      },
-      callback => {
-        runfork({
-          path: path.join(__dirname, '..', 'helpers', 'runResetMongo.js'),
-          env: {
-            URL: env.MONGO_URL_INTEGRATION
-          },
-          onExit (exitCode) {
-            if (exitCode > 0) {
-              return callback(new Error('Failed to reset MongoDB.'));
-            }
-            callback(null);
-          }
-        }, errfork => {
-          if (errfork) {
-            return callback(errfork);
-          }
-        });
-      },
-      callback => {
-        runfork({
-          path: path.join(__dirname, '..', 'helpers', 'runResetPostgres.js'),
-          env: {
-            NAMESPACE: namespace,
-            URL: env.POSTGRES_URL_INTEGRATION
-          },
-          onExit (exitCode) {
-            if (exitCode > 0) {
-              return callback(new Error('Failed to reset PostgreSQL.'));
-            }
-            callback(null);
-          }
-        }, errfork => {
-          if (errfork) {
-            return callback(errfork);
-          }
-        });
-      },
-      callback => {
-        runfork({
-          path: app,
-          env: {
-            API_KEYS: path.join(__dirname, '..', 'keys'),
-            API_HOST: 'localhost',
-            API_PORT: 3000,
-            API_PORT_PUBLIC: 3000,
-            API_CORS_ORIGIN: '*',
-            APPLICATION: application,
-            COMMANDBUS_URL: env.RABBITMQ_URL_INTEGRATION,
-            EVENTBUS_URL: env.RABBITMQ_URL_INTEGRATION,
-            EVENTSTORE_TYPE: 'postgres',
-            EVENTSTORE_URL: env.POSTGRES_URL_INTEGRATION,
-            IDENTITYPROVIDER_CERTIFICATE: path.join(__dirname, '..', 'keys'),
-            IDENTITYPROVIDER_NAME: 'auth.wolkenkit.io',
-            LISTSTORE_URL: env.MONGO_URL_INTEGRATION,
-            PROFILING_HOST: 'localhost',
-            PROFILING_PORT: 8125
-          }
-        }, (err, stop) => {
-          if (err) {
-            return callback(err);
-          }
+    eventStore = new EventStore();
+    await eventStore.initialize({ url: env.POSTGRES_URL_INTEGRATION, namespace });
 
-          stopApp = stop;
-          setTimeout(() => {
-            callback(null);
-          }, 2 * 1000);
-        });
+    mq = await hase.connect(env.RABBITMQ_URL_INTEGRATION);
+    commandbus = await mq.worker('plcr::commands').createReadStream();
+    eventbus = await mq.publisher('plcr::events').createWriteStream();
+
+    await new Promise((resolve, reject) => {
+      runfork({
+        path: path.join(__dirname, '..', 'helpers', 'runResetMongo.js'),
+        env: {
+          URL: env.MONGO_URL_INTEGRATION
+        },
+        onExit (exitCode) {
+          if (exitCode > 0) {
+            return reject(new Error('Failed to reset MongoDB.'));
+          }
+          resolve();
+        }
+      });
+    });
+
+    await new Promise((resolve, reject) => {
+      runfork({
+        path: path.join(__dirname, '..', 'helpers', 'runResetPostgres.js'),
+        env: {
+          NAMESPACE: namespace,
+          URL: env.POSTGRES_URL_INTEGRATION
+        },
+        onExit (exitCode) {
+          if (exitCode > 0) {
+            return reject(new Error('Failed to reset PostgreSQL.'));
+          }
+          resolve();
+        }
+      });
+    });
+
+    stopApp = runfork({
+      path: app,
+      env: {
+        API_KEYS: path.join(__dirname, '..', 'keys'),
+        API_HOST: 'localhost',
+        API_PORT: 3000,
+        API_CORS_ORIGIN: '*',
+        APPLICATION: application,
+        COMMANDBUS_URL: env.RABBITMQ_URL_INTEGRATION,
+        EVENTBUS_URL: env.RABBITMQ_URL_INTEGRATION,
+        EVENTSTORE_TYPE: 'postgres',
+        EVENTSTORE_URL: env.POSTGRES_URL_INTEGRATION,
+        IDENTITYPROVIDER_CERTIFICATE: path.join(__dirname, '..', 'keys'),
+        IDENTITYPROVIDER_NAME: 'auth.wolkenkit.io',
+        LISTSTORE_URL: env.MONGO_URL_INTEGRATION,
+        PROFILING_HOST: 'localhost',
+        PROFILING_PORT: 8125
       }
-    ], done);
+    });
+
+    await sleep(2 * 1000);
   });
 
-  teardown(done => {
-    mq.connection.close(errMq => {
-      if (errMq && errMq.message !== 'Connection closed (Error: Unexpected close)') {
-        return done(errMq);
+  teardown(async () => {
+    try {
+      await mq.connection.close();
+    } catch (ex) {
+      if (ex.message !== 'Connection closed (Error: Unexpected close)') {
+        throw ex;
       }
+    }
 
-      // We don't explicitly run eventStore.destroy() here, because it caused
-      // strange problems on CircleCI. The tests hang in the teardown function.
-      // This can be tracked down to disposing and destroying the internal pool
-      // of knex, which is provided by pool2. We don't have an idea WHY it works
-      // this way, but apparently it does.
-
-      stopApp();
-      done(null);
-    });
+    await eventStore.destroy();
+    await stopApp();
   });
 
   suite('infrastructure recovery', () => {
-    test('exits when the connection to the command bus / event bus is lost.', done => {
-      shell.exec('docker kill rabbitmq-integration', exitCode => {
-        assert.that(exitCode).is.equalTo(0);
+    test('exits when the connection to the command bus / event bus is lost.', async () => {
+      shell.exec('docker kill rabbitmq-integration');
 
-        setTimeout(() => {
-          request.
-            get('https://localhost:3000/v1/ping').
-            end(err => {
-              assert.that(err).is.not.null();
-              assert.that(err.code).is.equalTo('ECONNREFUSED');
+      await sleep(1 * 1000);
 
-              shell.exec('docker start rabbitmq-integration');
-              waitForRabbitMq({ url: env.RABBITMQ_URL_INTEGRATION }, done);
-            });
-        }, 1 * 1000);
-      });
+      await assert.that(async () => {
+        await request.get('https://localhost:3000/v1/ping');
+      }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
+
+      shell.exec('docker start rabbitmq-integration');
+      await waitForRabbitMq({ url: env.RABBITMQ_URL_INTEGRATION });
     });
 
-    test('exits when the connection to the event store is lost.', done => {
-      shell.exec('docker kill postgres-integration', exitCode => {
-        assert.that(exitCode).is.equalTo(0);
+    test('exits when the connection to the event store is lost.', async () => {
+      shell.exec('docker kill postgres-integration');
 
-        setTimeout(() => {
-          request.
-            get('https://localhost:3000/v1/ping').
-            end(err => {
-              assert.that(err).is.not.null();
-              assert.that(err.code).is.equalTo('ECONNREFUSED');
+      await sleep(1 * 1000);
 
-              shell.exec('docker start postgres-integration');
-              waitForPostgres({ url: env.POSTGRES_URL_INTEGRATION }, errWaitForHost => {
-                assert.that(errWaitForHost).is.null();
+      await assert.that(async () => {
+        await request.get('https://localhost:3000/v1/ping');
+      }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
 
-                // We need to wait for a few seconds after having started
-                // PostgreSQL, as it (for whatever reason) takes a long time
-                // to actually become available. If we don't do a sleep here,
-                // we run into "the database system is starting up" errors.
-                setTimeout(() => {
-                  done();
-                }, 5 * 1000);
-              });
-            });
-        }, 1 * 1000);
-      });
+      shell.exec('docker start postgres-integration');
+      await waitForPostgres({ url: env.POSTGRES_URL_INTEGRATION });
+
+      // We need to wait for a few seconds after having started
+      // PostgreSQL, as it (for whatever reason) takes a long time
+      // to actually become available. If we don't do a sleep here,
+      // we run into "the database system is starting up" errors.
+      await sleep(5 * 1000);
     });
 
-    test('exits when the connection to a list store is lost.', done => {
-      shell.exec('docker kill mongodb-integration', exitCode => {
-        assert.that(exitCode).is.equalTo(0);
+    test('exits when the connection to a list store is lost.', async () => {
+      shell.exec('docker kill mongodb-integration');
 
-        setTimeout(() => {
-          request.
-            get('https://localhost:3000/v1/ping').
-            end(err => {
-              assert.that(err).is.not.null();
-              assert.that(err.code).is.equalTo('ECONNREFUSED');
+      await sleep(1 * 1000);
 
-              shell.exec('docker start mongodb-integration');
-              waitForMongo({ url: env.MONGO_URL_INTEGRATION }, done);
-            });
-        }, 1 * 1000);
-      });
+      await assert.that(async () => {
+        await request.get('https://localhost:3000/v1/ping');
+      }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
+
+      shell.exec('docker start mongodb-integration');
+      await waitForMongo({ url: env.MONGO_URL_INTEGRATION });
     });
   });
 
   suite('commands', () => {
-    test('passes a command from API to commandbus.', done => {
+    test('passes a command from API to commandbus.', async () => {
       const command = buildCommand('planning', 'peerGroup', 'start', {
         initiator: 'John Doe',
         destination: 'Somewhere over the rainbow'
       });
 
-      commandbus.once('data', message => {
-        const receivedCommand = message.payload;
+      await new Promise(async (resolve, reject) => {
+        try {
+          commandbus.once('data', message => {
+            try {
+              const receivedCommand = message.payload;
 
-        assert.that(receivedCommand.name).is.equalTo('start');
-        message.next();
-        done();
-      });
+              assert.that(receivedCommand.name).is.equalTo('start');
+              message.next();
+            } catch (ex) {
+              return reject(ex);
+            }
+            resolve();
+          });
 
-      api.sendCommand(command, (err, res) => {
-        assert.that(err).is.null();
-        assert.that(res.statusCode).is.equalTo(200);
+          const res = await api.sendCommand(command);
+
+          assert.that(res.statusCode).is.equalTo(200);
+        } catch (ex) {
+          reject(ex);
+        }
       });
     });
   });
 
   suite('events', () => {
-    test('passes domain events from the eventbus to the API.', done => {
+    test('passes domain events from the eventbus to the API.', async () => {
       const event = buildEvent('planning', 'peerGroup', 'started', {
         initiator: 'John Doe',
         destination: 'Somewhere over the rainbow'
       });
 
-      api.subscribeToEvents({
-        onConnect () {
-          eventbus.write(event);
-        },
-        onData (receivedEvent, unsubscribe) {
-          unsubscribe(() => {
-            assert.that(receivedEvent.name).is.equalTo('started');
-            done();
+      await new Promise(async (resolve, reject) => {
+        try {
+          await api.subscribeToEvents({
+            async onConnect () {
+              eventbus.write(event);
+            },
+            async onData (receivedEvent, unsubscribe) {
+              try {
+                await unsubscribe();
+                assert.that(receivedEvent.name).is.equalTo('started');
+              } catch (ex) {
+                return reject(ex);
+              }
+              resolve();
+            },
+            async onError (err) {
+              reject(err);
+            }
           });
-        },
-        onError (err) {
-          done(err);
+        } catch (ex) {
+          reject(ex);
         }
       });
     });
 
-    test('delivers model events to the API.', done => {
+    test('delivers model events to the API.', async () => {
       const event = buildEvent('planning', 'peerGroup', 'started', {
         initiator: 'John Doe',
         destination: 'Somewhere over the rainbow'
@@ -384,85 +340,116 @@ suite('integrationTests', function () {
 
       let counter = 0;
 
-      api.subscribeToEvents({
-        onConnect () {
-          eventbus.write(event);
-        },
-        onData (receivedEvent, unsubscribe) {
-          counter += 1;
+      await new Promise(async (resolve, reject) => {
+        try {
+          await api.subscribeToEvents({
+            async onConnect () {
+              eventbus.write(event);
+            },
+            async onData (receivedEvent, unsubscribe) {
+              try {
+                counter += 1;
 
-          switch (counter) {
-            case 1:
-              assert.that(receivedEvent.type).is.equalTo('domain');
-              break;
-            case 2:
-              assert.that(receivedEvent.type).is.equalTo('readModel');
-              assert.that(receivedEvent.aggregate.name).is.equalTo('peerGroups');
-              break;
-            case 3:
-              assert.that(receivedEvent.type).is.equalTo('readModel');
-              assert.that(receivedEvent.aggregate.name).is.equalTo('tasteMakers');
-              unsubscribe(() => {
-                done();
-              });
-              break;
-            default:
-              throw new Error('Invalid operation.');
-          }
-        },
-        onError (err) {
-          done(err);
+                switch (counter) {
+                  case 1: {
+                    assert.that(receivedEvent.type).is.equalTo('domain');
+                    break;
+                  }
+                  case 2: {
+                    assert.that(receivedEvent.type).is.equalTo('readModel');
+                    assert.that(receivedEvent.aggregate.name).is.equalTo('peerGroups');
+                    break;
+                  }
+                  case 3: {
+                    assert.that(receivedEvent.type).is.equalTo('readModel');
+                    assert.that(receivedEvent.aggregate.name).is.equalTo('tasteMakers');
+                    await unsubscribe();
+                    resolve();
+                    break;
+                  }
+                  default: {
+                    reject(new Error('Invalid operation.'));
+                  }
+                }
+              } catch (ex) {
+                reject(ex);
+              }
+            },
+            async onError (err) {
+              reject(err);
+            }
+          });
+        } catch (ex) {
+          reject(ex);
         }
       });
     });
 
-    test('proceeds ...Rejected events.', done => {
+    test('proceeds ...Rejected events.', async () => {
       const eventStartRejected = buildEvent('planning', 'peerGroup', 'startRejected', {
         reason: 'Something went wrong...'
       });
 
       Reflect.deleteProperty(eventStartRejected.metadata, 'position');
 
-      api.subscribeToEvents({
-        onConnect () {
-          eventbus.write(eventStartRejected);
-        },
-        onData (receivedEvent, unsubscribe) {
-          assert.that(receivedEvent.name).is.equalTo('startRejected');
-          unsubscribe(() => {
-            done();
+      await new Promise(async (resolve, reject) => {
+        try {
+          await api.subscribeToEvents({
+            async onConnect () {
+              eventbus.write(eventStartRejected);
+            },
+            async onData (receivedEvent, unsubscribe) {
+              try {
+                assert.that(receivedEvent.name).is.equalTo('startRejected');
+                await unsubscribe();
+              } catch (ex) {
+                return reject(ex);
+              }
+              resolve();
+            },
+            async onError (err) {
+              reject(err);
+            }
           });
-        },
-        onError (err) {
-          done(err);
+        } catch (ex) {
+          reject(ex);
         }
       });
     });
 
-    test('proceeds ...Failed events.', done => {
+    test('proceeds ...Failed events.', async () => {
       const eventStartFailed = buildEvent('planning', 'peerGroup', 'startFailed', {
         reason: 'Something went wrong...'
       });
 
       Reflect.deleteProperty(eventStartFailed.metadata, 'position');
 
-      api.subscribeToEvents({
-        onConnect () {
-          eventbus.write(eventStartFailed);
-        },
-        onData (receivedEvent, unsubscribe) {
-          assert.that(receivedEvent.name).is.equalTo('startFailed');
-          unsubscribe(() => {
-            done();
+      await new Promise(async (resolve, reject) => {
+        try {
+          await api.subscribeToEvents({
+            async onConnect () {
+              eventbus.write(eventStartFailed);
+            },
+            async onData (receivedEvent, unsubscribe) {
+              try {
+                assert.that(receivedEvent.name).is.equalTo('startFailed');
+                await unsubscribe();
+              } catch (ex) {
+                return reject(ex);
+              }
+              resolve();
+            },
+            async onError (err) {
+              reject(err);
+            }
           });
-        },
-        onError (err) {
-          done(err);
+        } catch (ex) {
+          reject(ex);
         }
       });
     });
 
-    test('skips events that had already been processed.', done => {
+    test('skips events that had already been processed.', async () => {
       const eventStarted = buildEvent('planning', 'peerGroup', 'started', {
         initiator: 'John Doe',
         destination: 'Somewhere over the rainbow'
@@ -472,35 +459,44 @@ suite('integrationTests', function () {
       eventStarted.metadata.position = 1;
       eventFinished.metadata.position = 2;
 
-      let counter = 0;
+      await new Promise(async (resolve, reject) => {
+        try {
+          let counter = 0;
 
-      api.subscribeToEvents({
-        onConnect () {
-          eventbus.write(eventStarted);
-          eventbus.write(eventStarted);
-          eventbus.write(eventFinished);
-        },
-        onData (receivedEvent, unsubscribe) {
-          if (receivedEvent.type !== 'domain') {
-            return;
-          }
+          await api.subscribeToEvents({
+            async onConnect () {
+              eventbus.write(eventStarted);
+              eventbus.write(eventStarted);
+              eventbus.write(eventFinished);
+            },
+            async onData (receivedEvent, unsubscribe) {
+              try {
+                if (receivedEvent.type !== 'domain') {
+                  return;
+                }
 
-          counter += 1;
+                counter += 1;
 
-          if (receivedEvent.name === 'finished') {
-            assert.that(counter).is.equalTo(2);
-            unsubscribe(() => {
-              done();
-            });
-          }
-        },
-        onError (err) {
-          done(err);
+                if (receivedEvent.name === 'finished') {
+                  assert.that(counter).is.equalTo(2);
+                  await unsubscribe();
+                  resolve();
+                }
+              } catch (ex) {
+                reject(ex);
+              }
+            },
+            async onError (err) {
+              reject(err);
+            }
+          });
+        } catch (ex) {
+          reject(ex);
         }
       });
     });
 
-    test('does not forward replayed events.', done => {
+    test('does not forward replayed events.', async () => {
       const aggregateId = uuid();
 
       const eventStarted = buildEvent('planning', 'peerGroup', aggregateId, 'started', {
@@ -518,40 +514,40 @@ suite('integrationTests', function () {
       eventJoined1.metadata.revision = 2;
       eventJoined2.metadata.revision = 3;
 
-      let lastPosition;
+      const savedEvents = await eventStore.saveEvents({
+        events: [ eventStarted, eventJoined1, eventJoined2 ]
+      });
 
-      async.series({
-        prefillEventStore (doneSeries) {
-          eventStore.saveEvents({ events: [ eventStarted, eventJoined1, eventJoined2 ]}, (err, savedEvents) => {
-            if (err) {
-              doneSeries(err);
-            }
-            lastPosition = savedEvents[2].metadata.position;
-            doneSeries(null);
-          });
-        },
-        sendEventToApi (doneSeries) {
-          eventJoined2.metadata.position = lastPosition;
+      const lastPosition = savedEvents[2].metadata.position;
 
-          api.subscribeToEvents({
-            onConnect () {
+      eventJoined2.metadata.position = lastPosition;
+
+      await new Promise(async (resolve, reject) => {
+        try {
+          await api.subscribeToEvents({
+            async onConnect () {
               eventbus.write(eventJoined2);
             },
-            onData (receivedEvent, unsubscribe) {
-              assert.that(receivedEvent.data.participant).is.equalTo('Jenny Doe');
-              unsubscribe(() => {
-                doneSeries(null);
-              });
+            async onData (receivedEvent, unsubscribe) {
+              try {
+                assert.that(receivedEvent.data.participant).is.equalTo('Jenny Doe');
+                await unsubscribe();
+              } catch (ex) {
+                return reject(ex);
+              }
+              resolve();
             },
-            onError (err) {
-              done(err);
+            async onError (err) {
+              reject(err);
             }
           });
+        } catch (ex) {
+          reject(ex);
         }
-      }, done);
+      });
     });
 
-    test('replays events for a new model.', done => {
+    test('replays events for a new model.', async () => {
       const aggregateId = uuid();
 
       const eventStarted = buildEvent('planning', 'peerGroup', aggregateId, 'started', {
@@ -569,52 +565,45 @@ suite('integrationTests', function () {
       eventJoined1.metadata.revision = 2;
       eventJoined2.metadata.revision = 3;
 
-      let lastPosition;
+      const savedEvents = await eventStore.saveEvents({
+        events: [ eventStarted, eventJoined1, eventJoined2 ]
+      });
 
-      async.series({
-        prefillEventStore (doneSeries) {
-          eventStore.saveEvents({ events: [ eventStarted, eventJoined1, eventJoined2 ]}, (err, savedEvents) => {
-            if (err) {
-              doneSeries(err);
-            }
-            lastPosition = savedEvents[2].metadata.position;
-            doneSeries(null);
-          });
-        },
-        sendEventToApi (doneSeries) {
-          eventJoined2.metadata.position = lastPosition;
+      const lastPosition = savedEvents[2].metadata.position;
 
+      eventJoined2.metadata.position = lastPosition;
+
+      await new Promise(async (resolve, reject) => {
+        try {
           api.subscribeToEvents({
-            onConnect () {
+            async onConnect () {
               eventbus.write(eventJoined2);
             },
-            onData (receivedEvent, unsubscribe) {
-              unsubscribe(() => {
-                doneSeries(null);
-              });
+            async onData (receivedEvent, unsubscribe) {
+              await unsubscribe();
+              resolve();
             },
-            onError (err) {
-              done(err);
+            async onError (err) {
+              reject(err);
             }
           });
-        },
-        readModel (doneSeries) {
-          api.readModel({
-            modelType: 'lists',
-            modelName: 'peerGroups'
-          }, (err, model) => {
-            assert.that(err).is.null();
-            assert.that(model.length).is.equalTo(1);
-            assert.that(model[0].initiator).is.equalTo('John Doe');
-            assert.that(model[0].destination).is.equalTo('Somewhere over the rainbow');
-            assert.that(model[0].participants).is.equalTo([ 'Jane Doe', 'Jenny Doe' ]);
-            doneSeries();
-          });
+        } catch (ex) {
+          reject(ex);
         }
-      }, done);
+      });
+
+      const model = await api.readModel({
+        modelType: 'lists',
+        modelName: 'peerGroups'
+      });
+
+      assert.that(model.length).is.equalTo(1);
+      assert.that(model[0].initiator).is.equalTo('John Doe');
+      assert.that(model[0].destination).is.equalTo('Somewhere over the rainbow');
+      assert.that(model[0].participants).is.equalTo([ 'Jane Doe', 'Jenny Doe' ]);
     });
 
-    test('replays events for an existing model.', done => {
+    test('replays events for an existing model.', async () => {
       const aggregateId = uuid();
 
       const eventStarted = buildEvent('planning', 'peerGroup', aggregateId, 'started', {
@@ -636,88 +625,87 @@ suite('integrationTests', function () {
       eventJoined2.metadata.revision = 3;
       eventJoined3.metadata.revision = 4;
 
-      let lastPosition;
+      let savedEvents = await eventStore.saveEvents({
+        events: [ eventStarted, eventJoined1 ]
+      });
 
-      async.series({
-        prefillEventStorePart1 (doneSeries) {
-          eventStore.saveEvents({ events: [ eventStarted, eventJoined1 ]}, (err, savedEvents) => {
-            if (err) {
-              doneSeries(err);
-            }
-            lastPosition = savedEvents[1].metadata.position;
-            done(null);
-          });
-        },
-        sendEventToApiPart1 (doneSeries) {
-          eventJoined1.metadata.position = lastPosition;
+      let lastPosition = savedEvents[1].metadata.position;
 
-          api.subscribeToEvents({
-            onConnect () {
+      eventJoined1.metadata.position = lastPosition;
+
+      await new Promise(async (resolve, reject) => {
+        try {
+          await api.subscribeToEvents({
+            async onConnect () {
               eventbus.write(eventJoined1);
             },
-            onData (receivedEvent, unsubscribe) {
-              if (receivedEvent.metadata.correlatationId === eventJoined1.metadata.correlatationId) {
-                unsubscribe(() => {
-                  doneSeries(null);
-                });
+            async onData (receivedEvent, unsubscribe) {
+              try {
+                if (receivedEvent.metadata.correlatationId === eventJoined1.metadata.correlatationId) {
+                  await unsubscribe();
+                  resolve();
+                }
+              } catch (ex) {
+                reject(ex);
               }
             },
-            onError (err) {
-              done(err);
+            async onError (err) {
+              reject(err);
             }
           });
-        },
-        prefillEventStorePart2 (doneSeries) {
-          eventStore.saveEvents({ events: [ eventJoined2, eventJoined3 ]}, (err, savedEvents) => {
-            if (err) {
-              doneSeries(err);
-            }
-            lastPosition = savedEvents[1].metadata.position;
-            done(null);
-          });
-        },
-        sendEventToApiPart2 (doneSeries) {
-          eventJoined3.metadata.position = lastPosition;
+        } catch (ex) {
+          reject(ex);
+        }
+      });
 
-          api.subscribeToEvents({
-            onConnect () {
+      savedEvents = await eventStore.saveEvents({
+        events: [ eventJoined2, eventJoined3 ]
+      });
+
+      lastPosition = savedEvents[1].metadata.position;
+
+      eventJoined3.metadata.position = lastPosition;
+
+      await new Promise(async (resolve, reject) => {
+        try {
+          await api.subscribeToEvents({
+            async onConnect () {
               eventbus.write(eventJoined3);
             },
-            onData (receivedEvent, unsubscribe) {
-              if (receivedEvent.metadata.correlatationId === eventJoined3.metadata.correlatationId) {
-                unsubscribe(() => {
-                  doneSeries(null);
-                });
+            async onData (receivedEvent, unsubscribe) {
+              try {
+                if (receivedEvent.metadata.correlatationId === eventJoined3.metadata.correlatationId) {
+                  await unsubscribe();
+                  resolve();
+                }
+              } catch (ex) {
+                reject(ex);
               }
             },
-            onError (err) {
-              done(err);
+            async onError (err) {
+              reject(err);
             }
           });
-        },
-        readModel (doneSeries) {
-          api.readModel({
-            modelType: 'lists',
-            modelName: 'peerGroups'
-          }, (err, model) => {
-            assert.that(err).is.null();
-            assert.that(model.length).is.equalTo(1);
-            assert.that(model[0]).is.equalTo({
-              id: aggregateId,
-              initiator: 'John Doe',
-              destination: 'Somewhere over the rainbow',
-              participants: [ 'John Doe', 'Jane Doe', 'Jenny Doe', 'Jim Doe' ]
-            });
-            doneSeries();
-          });
+        } catch (ex) {
+          reject(ex);
         }
-      }, done);
+      });
+
+      const model = await api.readModel({
+        modelType: 'lists',
+        modelName: 'peerGroups'
+      });
+
+      assert.that(model.length).is.equalTo(1);
+      assert.that(model[0].initiator).is.equalTo('John Doe');
+      assert.that(model[0].destination).is.equalTo('Somewhere over the rainbow');
+      assert.that(model[0].participants).is.equalTo([ 'Jane Doe', 'Jenny Doe', 'Jim Doe' ]);
     });
   });
 
   suite('models', () => {
     suite('reading', () => {
-      setup(done => {
+      setup(async () => {
         const eventFirst = buildEvent('planning', 'peerGroup', 'started', {
           initiator: 'John Doe',
           destination: 'Somewhere over the rainbow'
@@ -733,143 +721,129 @@ suite('integrationTests', function () {
         eventbus.write(eventFirst);
         eventbus.write(eventSecond);
 
-        setTimeout(() => done(), 0.1 * 1000);
+        await sleep(0.1 * 1000);
       });
 
-      test('returns an error when the model name does not exist.', done => {
-        api.readModel({
-          modelType: 'lists',
-          modelName: 'foo'
-        }, err => {
-          assert.that(err).is.not.null();
-          done();
-        });
+      test('throws an error when the model name does not exist.', async () => {
+        await assert.that(async () => {
+          await api.readModel({
+            modelType: 'lists',
+            modelName: 'foo'
+          });
+        }).is.throwingAsync();
       });
 
-      test('returns a stream that the requested model\'s data is written to.', done => {
-        api.readModel({
+      test('returns a stream that the requested model\'s data is written to.', async () => {
+        const model = await api.readModel({
           modelType: 'lists',
           modelName: 'peerGroups'
-        }, (err, model) => {
-          assert.that(err).is.null();
-          assert.that(model.length).is.equalTo(2);
-          done();
         });
+
+        assert.that(model.length).is.equalTo(2);
       });
 
-      test('returns a stream that the requested model\'s data is written to filtered by the given selector.', done => {
-        api.readModel({
+      test('returns a stream that the requested model\'s data is written to filtered by the given selector.', async () => {
+        const model = await api.readModel({
           modelType: 'lists',
           modelName: 'peerGroups',
           query: {
             where: { initiator: 'Jane Doe' }
           }
-        }, (err, model) => {
-          assert.that(err).is.null();
-          assert.that(model.length).is.equalTo(1);
-          assert.that(model[0].initiator).is.equalTo('Jane Doe');
-          done();
         });
+
+        assert.that(model.length).is.equalTo(1);
+        assert.that(model[0].initiator).is.equalTo('Jane Doe');
       });
 
-      test('returns a stream that is limited to the number of requested documents.', done => {
-        api.readModel({
+      test('returns a stream that is limited to the number of requested documents.', async () => {
+        const model = await api.readModel({
           modelType: 'lists',
           modelName: 'peerGroups',
           query: {
             take: 1
           }
-        }, (err, model) => {
-          assert.that(err).is.null();
-          assert.that(model.length).is.equalTo(1);
-          assert.that(model[0].initiator).is.equalTo('John Doe');
-          done();
         });
+
+        assert.that(model.length).is.equalTo(1);
+        assert.that(model[0].initiator).is.equalTo('John Doe');
       });
 
-      test('returns a stream that skips the specified number of documents.', done => {
-        api.readModel({
+      test('returns a stream that skips the specified number of documents.', async () => {
+        const model = await api.readModel({
           modelType: 'lists',
           modelName: 'peerGroups',
           query: {
             skip: 1
           }
-        }, (err, model) => {
-          assert.that(err).is.null();
-          assert.that(model.length).is.equalTo(1);
-          assert.that(model[0].initiator).is.equalTo('Jane Doe');
-          done();
         });
+
+        assert.that(model.length).is.equalTo(1);
+        assert.that(model[0].initiator).is.equalTo('Jane Doe');
       });
 
-      test('returns a stream that is sorted by the specified criteria.', done => {
-        api.readModel({
+      test('returns a stream that is sorted by the specified criteria.', async () => {
+        const model = await api.readModel({
           modelType: 'lists',
           modelName: 'peerGroups',
           query: {
             orderBy: { initiator: 'asc' }
           }
-        }, (err, model) => {
-          assert.that(err).is.null();
-          assert.that(model.length).is.equalTo(2);
-          assert.that(model[0].initiator).is.equalTo('Jane Doe');
-          assert.that(model[1].initiator).is.equalTo('John Doe');
-          done();
         });
+
+        assert.that(model.length).is.equalTo(2);
+        assert.that(model[0].initiator).is.equalTo('Jane Doe');
+        assert.that(model[1].initiator).is.equalTo('John Doe');
       });
 
-      test('streams the data as JSON items.', done => {
-        api.readModel({
+      test('streams the data as JSON items.', async () => {
+        const model = await api.readModel({
           modelType: 'lists',
           modelName: 'peerGroups',
           query: {
             where: { initiator: 'Jane Doe' }
           }
-        }, (err, model) => {
-          assert.that(err).is.null();
-          assert.that(model.length).is.equalTo(1);
-          assert.that(model[0].initiator).is.equalTo('Jane Doe');
-          assert.that(model[0].destination).is.equalTo('Land of Oz');
-          assert.that(model[0].participants).is.equalTo([]);
-          done();
         });
+
+        assert.that(model.length).is.equalTo(1);
+        assert.that(model[0].initiator).is.equalTo('Jane Doe');
+        assert.that(model[0].destination).is.equalTo('Land of Oz');
+        assert.that(model[0].participants).is.equalTo([]);
       });
 
-      test('closes the stream once all data have been sent.', done => {
-        jsonLinesClient({
+      test('closes the stream once all data have been sent.', async () => {
+        const server = await jsonLinesClient({
           protocol: 'https',
           host: 'localhost',
           port: 3000,
           path: `/v1/read/lists/peerGroups`
-        }, server => {
-          server.stream.resume();
+        });
+
+        await new Promise(resolve => {
           server.stream.once('end', () => {
-            done();
+            resolve();
           });
+
+          server.stream.resume();
         });
       });
 
-      test('handles external stream closing gracefully.', done => {
-        jsonLinesClient({
+      test('handles external stream closing gracefully.', async () => {
+        const server = await jsonLinesClient({
           protocol: 'https',
           host: 'localhost',
           port: 3000,
           path: `/v1/read/lists/peerGroups`
-        }, server => {
-          server.disconnect();
-
-          // Now that we forced the stream to be closed, let's wait for some time
-          // to make sure that the app is still running.
-          setTimeout(() => {
-            request.
-              get('https://localhost:3000/v1/ping').
-              end((err, res) => {
-                assert.that(err).is.null();
-                assert.that(res.statusCode).is.equalTo(200);
-                done();
-              });
-          }, 1 * 1000);
         });
+
+        server.disconnect();
+
+        // Now that we forced the stream to be closed, let's wait for some time
+        // to make sure that the app is still running.
+        await sleep(1 * 1000);
+
+        const res = await request.get('https://localhost:3000/v1/ping');
+
+        assert.that(res.statusCode).is.equalTo(200);
       });
     });
 
@@ -878,7 +852,7 @@ suite('integrationTests', function () {
           eventForOwner,
           eventForPublic;
 
-      setup(done => {
+      setup(async () => {
         eventForOwner = buildEvent('planning', 'peerGroup', 'started', {
           initiator: 'Jane Doe',
           destination: 'Somewhere over the rainbow'
@@ -906,52 +880,46 @@ suite('integrationTests', function () {
         eventbus.write(eventForAuthenticated);
         eventbus.write(eventForPublic);
 
-        setTimeout(() => done(), 0.1 * 1000);
+        await sleep(0.1 * 1000);
       });
 
-      test('reads items for public users.', done => {
-        api.readModel({
+      test('reads items for public users.', async () => {
+        const model = await api.readModel({
           modelType: 'lists',
           modelName: 'peerGroups'
-        }, (err, model) => {
-          assert.that(err).is.null();
-          assert.that(model.length).is.equalTo(1);
-          assert.that(model[0].initiator).is.equalTo('Jenny Doe');
-          done();
         });
+
+        assert.that(model.length).is.equalTo(1);
+        assert.that(model[0].initiator).is.equalTo('Jenny Doe');
       });
 
-      test('reads items for authenticated users.', done => {
-        api.readModel({
+      test('reads items for authenticated users.', async () => {
+        const model = await api.readModel({
           modelType: 'lists',
           modelName: 'peerGroups',
           headers: {
             authorization: `Bearer ${issueToken(uuid())}`
           }
-        }, (err, model) => {
-          assert.that(err).is.null();
-          assert.that(model.length).is.equalTo(2);
-          assert.that(model[0].initiator).is.equalTo('John Doe');
-          assert.that(model[1].initiator).is.equalTo('Jenny Doe');
-          done();
         });
+
+        assert.that(model.length).is.equalTo(2);
+        assert.that(model[0].initiator).is.equalTo('John Doe');
+        assert.that(model[1].initiator).is.equalTo('Jenny Doe');
       });
 
-      test('reads items for owners.', done => {
-        api.readModel({
+      test('reads items for owners.', async () => {
+        const model = await api.readModel({
           modelType: 'lists',
           modelName: 'peerGroups',
           headers: {
             authorization: `Bearer ${issueToken(eventForOwner.metadata.isAuthorized.owner)}`
           }
-        }, (err, model) => {
-          assert.that(err).is.null();
-          assert.that(model.length).is.equalTo(3);
-          assert.that(model[0].initiator).is.equalTo('Jane Doe');
-          assert.that(model[1].initiator).is.equalTo('John Doe');
-          assert.that(model[2].initiator).is.equalTo('Jenny Doe');
-          done();
         });
+
+        assert.that(model.length).is.equalTo(3);
+        assert.that(model[0].initiator).is.equalTo('Jane Doe');
+        assert.that(model[1].initiator).is.equalTo('John Doe');
+        assert.that(model[2].initiator).is.equalTo('Jenny Doe');
       });
     });
   });

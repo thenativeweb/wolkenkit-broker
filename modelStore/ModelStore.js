@@ -129,7 +129,7 @@ class ModelStore extends EventEmitter {
       throw new Error('Model name is missing.');
     }
 
-    const stream = await this.stores[modelType].read({ modelType, modelName, query });
+    const stream = await this.stores[modelType].read({ modelName, query });
 
     return stream;
   }

@@ -426,7 +426,6 @@ suite('ModelStore', () => {
 
       assert.that(peerGroups).is.equalTo('this should be a stream');
       assert.that(listStore.options).is.equalTo({
-        modelType: 'lists',
         modelName: 'peerGroups',
         query: {
           where: { foo: 'bar' }
@@ -560,7 +559,6 @@ suite('ModelStore', () => {
 
       assert.that(item).is.equalTo('this should be an item');
       assert.that(listStore.options).is.equalTo({
-        modelType: 'lists',
         modelName: 'peerGroups',
         query: {
           where: { foo: 'bar' },
