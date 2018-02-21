@@ -41,14 +41,7 @@ const appLogic = function ({ app, eventSequencer, eventStore, modelStore, readMo
 
   app.api.read = async function (modelType, modelName, { where, orderBy, skip, take }) {
     const incomingStream = await modelStore.read({
-      modelType,
-      modelName,
-      query: {
-        where,
-        orderBy,
-        skip,
-        take
-      }
+      modelType, modelName, query: { where, orderBy, skip, take }
     });
 
     // The outgoingStream is the stream that is used to send data to the

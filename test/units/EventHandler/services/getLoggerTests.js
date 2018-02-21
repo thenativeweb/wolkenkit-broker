@@ -15,8 +15,9 @@ const app = tailwind.createApp({
     certificate: path.join(__dirname, '..', '..', '..', 'keys', 'certificate.pem')
   }
 });
+
 const modelType = 'lists';
-const modelName = 'peerGroup';
+const modelName = 'peerGroups';
 
 suite('getLogger', () => {
   test('is a function.', async () => {
@@ -50,15 +51,13 @@ suite('getLogger', () => {
 
   test('returns a logger that uses the correct file name.', async () => {
     const logger = getLogger({ app, modelType, modelName });
-
     const stop = record();
 
     logger.info('Some log message...');
 
     const { stdout } = stop();
-
     const logMessage = JSON.parse(stdout);
 
-    assert.that(logMessage.source.endsWith('server/readModel/lists/peerGroup.js')).is.true();
+    assert.that(logMessage.source.endsWith('server/readModel/lists/peerGroups.js')).is.true();
   });
 });

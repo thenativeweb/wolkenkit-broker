@@ -1,8 +1,8 @@
 'use strict';
 
-const createReadModelAggregate = require('../readModelAggregates/create');
+const memoize = require('lodash/memoize');
 
-let app;
+const createReadModelAggregate = require('../readModelAggregates/create');
 
 const getApp = function ({ readModel, modelStore }) {
   if (!readModel) {
@@ -12,11 +12,7 @@ const getApp = function ({ readModel, modelStore }) {
     throw new Error('Model store is missing.');
   }
 
-  if (app) {
-    return app;
-  }
-
-  app = {};
+  const app = {};
 
   Object.keys(readModel).forEach(modelType => {
     app[modelType] = {};
@@ -34,4 +30,4 @@ const getApp = function ({ readModel, modelStore }) {
   return app;
 };
 
-module.exports = getApp;
+module.exports = memoize(getApp);

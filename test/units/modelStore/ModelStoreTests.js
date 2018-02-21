@@ -1,7 +1,7 @@
 'use strict';
 
-const EventEmitter = require('events').EventEmitter,
-      stream = require('stream');
+const { EventEmitter } = require('events'),
+      { PassThrough } = require('stream');
 
 const assert = require('assertthat');
 
@@ -9,8 +9,6 @@ const buildDomainEvent = require('../../helpers/buildEvent'),
       buildModelEvent = require('./buildModelEvent'),
       EventSequencer = require('../../../eventSequencer/EventSequencer'),
       ModelStore = require('../../../modelStore/ModelStore');
-
-const PassThrough = stream.PassThrough;
 
 suite('ModelStore', () => {
   let domainEvent,

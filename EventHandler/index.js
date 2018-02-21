@@ -46,7 +46,6 @@ class EventHandler {
     const eventName = `${domainEvent.context.name}.${domainEvent.aggregate.name}.${domainEvent.name}`;
     const modelEvents = [];
 
-    // this check is new...before it was async.each(this.eventListeners[eventName]
     if (!this.eventListeners[eventName]) {
       return modelEvents;
     }
@@ -55,11 +54,11 @@ class EventHandler {
       throw new Error(reason);
     };
 
+    const { app, readModel, modelStore } = this;
+
     for (let i = 0; i < this.eventListeners[eventName].length; i++) {
       const eventListener = this.eventListeners[eventName][i];
       const { modelType, modelName } = eventListener;
-
-      const { app, readModel, modelStore } = this;
 
       const readModelAggregate = createReadModelAggregate({
         readModel: readModel[eventListener.modelType][eventListener.modelName],

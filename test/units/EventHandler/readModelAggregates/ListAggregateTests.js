@@ -73,11 +73,6 @@ suite('ListAggregate', () => {
       });
 
       test('calls read on the model store.', async () => {
-        const fakeStream = new PassThrough({ objectMode: true });
-
-        fakeStream.write('foo');
-        fakeStream.end();
-
         const listAggregate = new ListAggregate.Readable({
           readModel,
           modelStore: {
@@ -86,6 +81,11 @@ suite('ListAggregate', () => {
               assert.that(options.modelType).is.equalTo('lists');
               assert.that(options.modelName).is.equalTo('peerGroups');
               assert.that(options.query).is.equalTo({ foo: 'bar' });
+
+              const fakeStream = new PassThrough({ objectMode: true });
+
+              fakeStream.write('foo');
+              fakeStream.end();
 
               return fakeStream;
             }
@@ -99,16 +99,16 @@ suite('ListAggregate', () => {
       });
 
       test('calls read on the model store with an empty query if no query is given.', async () => {
-        const fakeStream = new PassThrough({ objectMode: true });
-
-        fakeStream.write('foo');
-        fakeStream.end();
-
         const listAggregate = new ListAggregate.Readable({
           readModel,
           modelStore: {
             async read (options) {
               assert.that(options.query).is.equalTo({});
+
+              const fakeStream = new PassThrough({ objectMode: true });
+
+              fakeStream.write('foo');
+              fakeStream.end();
 
               return fakeStream;
             }

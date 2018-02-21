@@ -43,7 +43,7 @@ const performReplay = async function ({ eventStore, fromPosition, toPosition, ha
 
       /* eslint-disable no-unmodified-loop-condition */
       while (isOnDataProcessing) {
-        await new Promise(resolveTimer => setTimeout(resolveTimer, 100));
+        await new Promise(resolveTimeout => setTimeout(resolveTimeout, 100));
       }
       /* eslint-enable no-unmodified-loop-condition */
 

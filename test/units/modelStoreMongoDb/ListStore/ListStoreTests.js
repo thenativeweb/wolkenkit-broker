@@ -2,9 +2,10 @@
 
 const path = require('path');
 
-const _ = require('lodash'),
-      assert = require('assertthat'),
+const assert = require('assertthat'),
+      find = require('lodash/find'),
       { MongoClient } = require('mongodb'),
+      { parse } = require('mongodb-uri'),
       runfork = require('runfork'),
       sha1 = require('sha1'),
       uuid = require('uuidv4');
@@ -36,8 +37,6 @@ const getStoreOptions = () => {
 };
 
 suite('ListStore', () => {
-  let mongoClient;
-
   const resetMongoDb = async function () {
     await new Promise((resolve, reject) => {
       try {
@@ -50,7 +49,7 @@ suite('ListStore', () => {
             if (exitCode > 0) {
               return reject(new Error('Failed to reset MongoDB.'));
             }
-            resolve(null);
+            resolve();
           }
         });
       } catch (ex) {
@@ -71,24 +70,19 @@ suite('ListStore', () => {
     await resetMongoDb();
   });
 
-  setup(async () => {
-    /* eslint-disable id-length */
-    mongoClient = await MongoClient.connect(url, { w: 1 });
-    /* eslint-enable id-length */
-  });
-
-  teardown(async () => {
-    await mongoClient.close();
-  });
-
   suite('initialize', () => {
     test('creates collections and indexes.', async () => {
+      /* eslint-disable id-length */
+      const client = await MongoClient.connect(url, { w: 1 });
+      const db = await client.db(parse(url).database);
+      /* eslint-enable id-length */
+
       const listStore = new ListStore({ url, eventSequencer: new EventSequencer() }),
             storeOptions = getStoreOptions();
 
       await listStore.initialize(storeOptions.initializeOptions);
 
-      const collection = await mongoClient.collection(`foo_model_list_${storeOptions.modelName}`);
+      const collection = await db.collection(`foo_model_list_${storeOptions.modelName}`);
 
       const indexes = await collection.indexes();
 
@@ -100,9 +94,11 @@ suite('ListStore', () => {
       // 4. _id (defined by MongoDB internally)
       assert.that(indexes.length).is.equalTo(4);
 
-      assert.that(_.find(indexes, { name: sha1(`foo_model_list_${storeOptions.modelName}_id`).substr(0, 10) }).unique).is.true();
-      assert.that(_.find(indexes, { name: sha1(`foo_model_list_${storeOptions.modelName}_initiator`).substr(0, 10) }).unique).is.undefined();
-      assert.that(_.find(indexes, { name: sha1(`foo_model_list_${storeOptions.modelName}_destination`).substr(0, 10) }).unique).is.undefined();
+      assert.that(find(indexes, { name: sha1(`foo_model_list_${storeOptions.modelName}_id`).substr(0, 10) }).unique).is.true();
+      assert.that(find(indexes, { name: sha1(`foo_model_list_${storeOptions.modelName}_initiator`).substr(0, 10) }).unique).is.undefined();
+      assert.that(find(indexes, { name: sha1(`foo_model_list_${storeOptions.modelName}_destination`).substr(0, 10) }).unique).is.undefined();
+
+      await client.close();
     });
   });
 

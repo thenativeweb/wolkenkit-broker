@@ -17,7 +17,7 @@ const create = function ({ readModel, modelStore, modelType, modelName, domainEv
   }
 
   switch (modelType) {
-    case 'lists':
+    case 'lists': {
       if (domainEvent) {
         return new ListAggregate.Writable({
           readModel,
@@ -33,8 +33,10 @@ const create = function ({ readModel, modelStore, modelType, modelName, domainEv
         modelStore,
         modelName
       });
-    default:
+    }
+    default: {
       throw new Error('Invalid operation.');
+    }
   }
 };
 

@@ -3,14 +3,12 @@
 const path = require('path');
 
 const assert = require('assertthat'),
-
       WolkenkitApplication = require('wolkenkit-application');
 
-const ModelStore = require('../../../../modelStore/ModelStore');
+const getApp = require('../../../../EventHandler/services/getApp'),
+      ModelStore = require('../../../../modelStore/ModelStore');
 
-const getApp = require('../../../../EventHandler/services/getApp');
-
-const readModel = new WolkenkitApplication(path.join(__dirname, '..', '..', '..', '..', 'app')).readModel;
+const { readModel } = new WolkenkitApplication(path.join(__dirname, '..', '..', '..', '..', 'app'));
 
 const modelStore = new ModelStore();
 
@@ -27,9 +25,7 @@ suite('getApp', () => {
 
   test('throws an error if the model store is missing.', async () => {
     assert.that(() => {
-      /* eslint-disable no-new */
       getApp({ readModel });
-      /* eslint-enable no-new */
     }).is.throwing('Model store is missing.');
   });
 

@@ -1,9 +1,8 @@
 'use strict';
 
-const EventEmitter = require('events').EventEmitter;
+const { EventEmitter } = require('events');
 
 const assert = require('assertthat'),
-      async = require('async'),
       toArray = require('streamtoarray'),
       uuid = require('uuidv4');
 
@@ -21,12 +20,12 @@ const lists = function (options) {
         modelName,
         modelStore;
 
-    const simulateRestart = function (callback) {
+    const simulateRestart = async function () {
       const otherEventSequencer = new EventSequencer();
       const otherListStore = new ListStore({ url, eventSequencer: otherEventSequencer });
       const otherModelStore = new ModelStore();
 
-      otherModelStore.initialize({
+      await otherModelStore.initialize({
         application: 'integrationTests',
         eventSequencer: otherEventSequencer,
         readModel: {
@@ -44,133 +43,97 @@ const lists = function (options) {
         stores: {
           lists: otherListStore
         }
-      }, err => {
-        if (err) {
-          return callback(err);
-        }
-
-        callback(null, {
-          eventSequencer: otherEventSequencer,
-          listStore: otherListStore,
-          modelStore: otherModelStore
-        });
       });
+
+      return {
+        eventSequencer: otherEventSequencer,
+        listStore: otherListStore,
+        modelStore: otherModelStore
+      };
     };
 
-    suiteSetup(function (done) {
+    suiteSetup(async function () {
       this.timeout(10 * 1000);
 
-      resetDatabase(done);
+      await resetDatabase();
     });
 
-    suiteTeardown(function (done) {
+    suiteTeardown(async function () {
       this.timeout(10 * 1000);
 
-      resetDatabase(done);
+      await resetDatabase();
     });
 
-    setup(done => {
+    setup(async () => {
       modelName = `peerGroups${uuid().substr(0, 8)}`;
 
-      simulateRestart((err, other) => {
-        if (err) {
-          return done(err);
-        }
+      const other = await simulateRestart();
 
-        eventSequencer = other.eventSequencer;
-        listStore = other.listStore;
-        modelStore = other.modelStore;
-
-        done(null);
-      });
+      eventSequencer = other.eventSequencer;
+      listStore = other.listStore;
+      modelStore = other.modelStore;
     });
 
     suite('constructor', () => {
-      test('is a function.', done => {
+      test('is a function.', async () => {
         assert.that(ListStore).is.ofType('function');
-        done();
       });
 
-      test('throws an error if options are missing.', done => {
-        assert.that(() => {
-          /* eslint-disable no-new */
-          new ListStore();
-          /* eslint-enable no-new */
-        }).is.throwing('Options are missing.');
-        done();
-      });
-
-      test('throws an error if url is missing.', done => {
+      test('throws an error if url is missing.', async () => {
         assert.that(() => {
           /* eslint-disable no-new */
           new ListStore({ eventSequencer: new EventSequencer() });
           /* eslint-enable no-new */
         }).is.throwing('Url is missing.');
-        done();
       });
 
-      test('throws an error if event sequencer is missing.', done => {
+      test('throws an error if event sequencer is missing.', async () => {
         assert.that(() => {
           /* eslint-disable no-new */
           new ListStore({ url });
           /* eslint-enable no-new */
         }).is.throwing('Event sequencer is missing.');
-        done();
       });
     });
 
     suite('events', () => {
-      test('is an event emitter.', done => {
+      test('is an event emitter.', async () => {
         assert.that(listStore).is.instanceOf(EventEmitter);
-        done();
       });
 
-      test('emits a disconnect event when the connection to the database is lost.', function (done) {
+      test('emits a disconnect event when the connection to the database is lost.', async function () {
         this.timeout(15 * 1000);
 
-        listStore.once('disconnect', () => {
-          options.startContainer(done);
-        });
-
-        options.stopContainer();
+        await Promise.all([
+          new Promise(resolve => {
+            listStore.once('disconnect', async () => {
+              await options.startContainer();
+              resolve();
+            });
+          }),
+          options.stopContainer()
+        ]);
       });
     });
 
     suite('initialize', () => {
-      test('is a function.', done => {
+      test('is a function.', async () => {
         assert.that(listStore.initialize).is.ofType('function');
-        done();
       });
 
-      test('throws an error if options are missing.', done => {
-        assert.that(() => {
-          listStore.initialize();
-        }).is.throwing('Options are missing.');
-        done();
+      test('throws an error if application is missing.', async () => {
+        await assert.that(async () => {
+          await listStore.initialize({});
+        }).is.throwingAsync('Application is missing.');
       });
 
-      test('throws an error if application is missing.', done => {
-        assert.that(() => {
-          listStore.initialize({});
-        }).is.throwing('Application is missing.');
-        done();
+      test('throws an error if read model is missing.', async () => {
+        await assert.that(async () => {
+          await listStore.initialize({ application: 'foo' });
+        }).is.throwingAsync('Read model is missing.');
       });
 
-      test('throws an error if read model is missing.', done => {
-        assert.that(() => {
-          listStore.initialize({ application: 'foo' });
-        }).is.throwing('Read model is missing.');
-        done();
-      });
-
-      test('throws an error if callback is missing.', done => {
-        assert.that(() => {
-          listStore.initialize({ application: 'foo', readModel: {}});
-        }).is.throwing('Callback is missing.');
-        done();
-      });
-
-      test('registers all lists on the event sequencer.', done => {
+      test('registers all lists on the event sequencer.', async () => {
         // listStore.initialize() had already been called by the model store in
         // the setup function above.
 
@@ -179,492 +142,316 @@ const lists = function (options) {
             [modelName]: { lastProcessedPosition: 0 }
           }
         });
-        done();
       });
 
-      test('does not fail if model store has been initialized before.', done => {
-        simulateRestart(err => {
-          assert.that(err).is.null();
-          done();
-        });
+      test('does not fail if model store has been initialized before.', async () => {
+        await assert.that(async () => {
+          await simulateRestart();
+        }).is.not.throwingAsync();
       });
 
-      test('gets the correct positions for the event sequencer.', done => {
+      test('gets the correct positions for the event sequencer.', async () => {
         const domainEvent = buildDomainEvent('planning', 'peerGroup', 'joined', { participant: 'Jane Doe' });
 
         domainEvent.metadata.position = 1;
 
-        modelStore.processEvents(domainEvent, [], errAdded => {
-          assert.that(errAdded).is.null();
+        await modelStore.processEvents(domainEvent, []);
 
-          simulateRestart((err, other) => {
-            assert.that(err).is.null();
-            assert.that(other.eventSequencer.models).is.equalTo({
-              lists: {
-                [modelName]: { lastProcessedPosition: 1 }
-              }
-            });
-            done();
-          });
+        const other = await simulateRestart();
+
+        assert.that(other.eventSequencer.models).is.equalTo({
+          lists: {
+            [modelName]: { lastProcessedPosition: 1 }
+          }
         });
       });
     });
 
     suite('event handlers', () => {
       suite('added', () => {
-        test('is a function.', done => {
+        test('is a function.', async () => {
           assert.that(listStore.added).is.ofType('function');
-          done();
         });
 
-        test('throws an error if options are missing.', done => {
-          assert.that(() => {
-            listStore.added();
-          }).is.throwing('Options are missing.');
-          done();
+        test('throws an error if model name is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.added({});
+          }).is.throwingAsync('Model name is missing.');
         });
 
-        test('throws an error if model name is missing.', done => {
-          assert.that(() => {
-            listStore.added({});
-          }).is.throwing('Model name is missing.');
-          done();
+        test('throws an error if payload is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.added({ modelName: 'foo' });
+          }).is.throwingAsync('Payload is missing.');
         });
 
-        test('throws an error if payload is missing.', done => {
-          assert.that(() => {
-            listStore.added({ modelName: 'foo' });
-          }).is.throwing('Payload is missing.');
-          done();
-        });
-
-        test('throws an error if callback is missing.', done => {
-          assert.that(() => {
-            listStore.added({ modelName: 'foo', payload: 'bar' });
-          }).is.throwing('Callback is missing.');
-          done();
-        });
-
-        test('adds the given item.', done => {
+        test('adds the given item.', async () => {
           const payload = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []};
 
-          listStore.added({ modelName, payload }, errAdded => {
-            assert.that(errAdded).is.null();
+          await listStore.added({ modelName, payload });
 
-            listStore.read({ modelType: 'lists', modelName, query: {}}, (err, stream) => {
-              assert.that(err).is.null();
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
 
-              toArray(stream, (errToArray, peerGroups) => {
-                assert.that(errToArray).is.null();
-                assert.that(peerGroups.length).is.equalTo(1);
-                done();
-              });
-            });
-          });
+          assert.that(peerGroups.length).is.equalTo(1);
         });
       });
 
       suite('updated', () => {
-        test('is a function.', done => {
+        test('is a function.', async () => {
           assert.that(listStore.updated).is.ofType('function');
-          done();
         });
 
-        test('throws an error if options are missing.', done => {
-          assert.that(() => {
-            listStore.updated();
-          }).is.throwing('Options are missing.');
-          done();
+        test('throws an error if model name is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.updated({});
+          }).is.throwingAsync('Model name is missing.');
         });
 
-        test('throws an error if model name is missing.', done => {
-          assert.that(() => {
-            listStore.updated({});
-          }).is.throwing('Model name is missing.');
-          done();
+        test('throws an error if selector is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.updated({ modelName: 'foo' });
+          }).is.throwingAsync('Selector is missing.');
         });
 
-        test('throws an error if selector is missing.', done => {
-          assert.that(() => {
-            listStore.updated({ modelName: 'foo' });
-          }).is.throwing('Selector is missing.');
-          done();
+        test('throws an error if payload is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.updated({ modelName: 'foo', selector: 'bar' });
+          }).is.throwingAsync('Payload is missing.');
         });
 
-        test('throws an error if payload is missing.', done => {
-          assert.that(() => {
-            listStore.updated({ modelName: 'foo', selector: 'bar' });
-          }).is.throwing('Payload is missing.');
-          done();
-        });
-
-        test('throws an error if callback is missing.', done => {
-          assert.that(() => {
-            listStore.updated({ modelName: 'foo', selector: 'bar', payload: 'baz' });
-          }).is.throwing('Callback is missing.');
-          done();
-        });
-
-        test('returns an error if an invalid key is given.', done => {
+        test('throws an error if an invalid key is given.', async () => {
           const selector = { id: uuid() };
           const payloadUpdate = { $add: 'Jane Doe' };
 
-          listStore.updated({ modelName, selector, payload: payloadUpdate }, err => {
-            assert.that(err).is.not.null();
-            done();
-          });
+          await assert.that(async () => {
+            await listStore.updated({ modelName, selector, payload: payloadUpdate });
+          }).is.throwingAsync('Keys must not begin with a $ sign.');
         });
 
-        test('updates a single selected item using the update payload.', done => {
+        test('updates a single selected item using the update payload.', async () => {
           const payloadAdd = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []};
 
-          listStore.added({ modelName, payload: payloadAdd }, errAdded => {
-            assert.that(errAdded).is.null();
+          await listStore.added({ modelName, payload: payloadAdd });
 
-            const selector = { id: payloadAdd.id };
-            const payloadUpdate = { destination: 'Sultan Saray', participants: { $add: 'Jane Doe' }};
+          const selector = { id: payloadAdd.id };
+          const payloadUpdate = { destination: 'Sultan Saray', participants: { $add: 'Jane Doe' }};
 
-            listStore.updated({ modelName, selector, payload: payloadUpdate }, errUpdated => {
-              assert.that(errUpdated).is.null();
+          await listStore.updated({ modelName, selector, payload: payloadUpdate });
 
-              listStore.read({ modelType: 'lists', modelName, query: {}}, (err, stream) => {
-                assert.that(err).is.null();
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
 
-                toArray(stream, (errToArray, peerGroups) => {
-                  assert.that(errToArray).is.null();
-                  assert.that(peerGroups.length).is.equalTo(1);
-                  assert.that(peerGroups[0]).is.equalTo({
-                    id: payloadAdd.id,
-                    initiator: 'Jane Doe',
-                    destination: 'Sultan Saray',
-                    participants: [ 'Jane Doe' ]
-                  });
-                  done();
-                });
-              });
-            });
+          assert.that(peerGroups.length).is.equalTo(1);
+          assert.that(peerGroups[0]).is.equalTo({
+            id: payloadAdd.id,
+            initiator: 'Jane Doe',
+            destination: 'Sultan Saray',
+            participants: [ 'Jane Doe' ]
           });
         });
 
-        test('updates multiple selected items using the update payload.', done => {
+        test('updates multiple selected items using the update payload.', async () => {
           const payloadAddFirst = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
                 payloadAddSecond = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: []};
 
-          listStore.added({ modelName, payload: payloadAddFirst }, errAddedFirst => {
-            assert.that(errAddedFirst).is.null();
+          await listStore.added({ modelName, payload: payloadAddFirst });
+          await listStore.added({ modelName, payload: payloadAddSecond });
 
-            listStore.added({ modelName, payload: payloadAddSecond }, errAddedSecond => {
-              assert.that(errAddedSecond).is.null();
+          const selector = { destination: 'Riva' };
+          const payloadUpdate = { destination: 'Sultan Saray' };
 
-              const selector = { destination: 'Riva' };
-              const payloadUpdate = { destination: 'Sultan Saray' };
+          await listStore.updated({ modelName, selector, payload: payloadUpdate });
 
-              listStore.updated({ modelName, selector, payload: payloadUpdate }, errUpdated => {
-                assert.that(errUpdated).is.null();
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
 
-                listStore.read({ modelType: 'lists', modelName, query: {}}, (err, stream) => {
-                  assert.that(err).is.null();
-
-                  toArray(stream, (errToArray, peerGroups) => {
-                    assert.that(errToArray).is.null();
-                    assert.that(peerGroups.length).is.equalTo(2);
-                    assert.that(peerGroups[0]).is.equalTo({
-                      id: payloadAddFirst.id,
-                      initiator: 'Jane Doe',
-                      destination: 'Sultan Saray',
-                      participants: []
-                    });
-                    assert.that(peerGroups[1]).is.equalTo({
-                      id: payloadAddSecond.id,
-                      initiator: 'John Doe',
-                      destination: 'Sultan Saray',
-                      participants: []
-                    });
-                    done();
-                  });
-                });
-              });
-            });
+          assert.that(peerGroups.length).is.equalTo(2);
+          assert.that(peerGroups[0]).is.equalTo({
+            id: payloadAddFirst.id,
+            initiator: 'Jane Doe',
+            destination: 'Sultan Saray',
+            participants: []
+          });
+          assert.that(peerGroups[1]).is.equalTo({
+            id: payloadAddSecond.id,
+            initiator: 'John Doe',
+            destination: 'Sultan Saray',
+            participants: []
           });
         });
 
-        test('updates items selected by query using the update payload.', done => {
+        test('updates items selected by query using the update payload.', async () => {
           const payloadAddFirst = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
                 payloadAddSecond = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe', 'Jane Doe' ]};
 
-          listStore.added({ modelName, payload: payloadAddFirst }, errAddedFirst => {
-            assert.that(errAddedFirst).is.null();
+          await listStore.added({ modelName, payload: payloadAddFirst });
+          await listStore.added({ modelName, payload: payloadAddSecond });
 
-            listStore.added({ modelName, payload: payloadAddSecond }, errAddedSecond => {
-              assert.that(errAddedSecond).is.null();
+          const selector = { initiator: { $greaterThan: 'Jessy Doe' }};
+          const payloadUpdate = { destination: 'Sultan Saray' };
 
-              const selector = { initiator: { $greaterThan: 'Jessy Doe' }};
-              const payloadUpdate = { destination: 'Sultan Saray' };
+          await listStore.updated({ modelName, selector, payload: payloadUpdate });
 
-              listStore.updated({ modelName, selector, payload: payloadUpdate }, errUpdated => {
-                assert.that(errUpdated).is.null();
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
 
-                listStore.read({ modelType: 'lists', modelName, query: {}}, (err, stream) => {
-                  assert.that(err).is.null();
-
-                  toArray(stream, (errToArray, peerGroups) => {
-                    assert.that(errToArray).is.null();
-                    assert.that(peerGroups.length).is.equalTo(2);
-                    assert.that(peerGroups[0]).is.equalTo({
-                      id: payloadAddFirst.id,
-                      initiator: 'Jane Doe',
-                      destination: 'Riva',
-                      participants: []
-                    });
-                    assert.that(peerGroups[1]).is.equalTo({
-                      id: payloadAddSecond.id,
-                      initiator: 'John Doe',
-                      destination: 'Sultan Saray',
-                      participants: [ 'John Doe', 'Jane Doe' ]
-                    });
-                    done();
-                  });
-                });
-              });
-            });
+          assert.that(peerGroups.length).is.equalTo(2);
+          assert.that(peerGroups[0]).is.equalTo({
+            id: payloadAddFirst.id,
+            initiator: 'Jane Doe',
+            destination: 'Riva',
+            participants: []
+          });
+          assert.that(peerGroups[1]).is.equalTo({
+            id: payloadAddSecond.id,
+            initiator: 'John Doe',
+            destination: 'Sultan Saray',
+            participants: [ 'John Doe', 'Jane Doe' ]
           });
         });
       });
 
       suite('removed', () => {
-        test('is a function.', done => {
+        test('is a function.', async () => {
           assert.that(listStore.removed).is.ofType('function');
-          done();
         });
 
-        test('throws an error if options are missing.', done => {
-          assert.that(() => {
-            listStore.removed();
-          }).is.throwing('Options are missing.');
-          done();
+        test('throws an error if model name is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.removed({});
+          }).is.throwingAsync('Model name is missing.');
         });
 
-        test('throws an error if model name is missing.', done => {
-          assert.that(() => {
-            listStore.removed({});
-          }).is.throwing('Model name is missing.');
-          done();
+        test('throws an error if selector is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.removed({ modelName: 'foo' });
+          }).is.throwingAsync('Selector is missing.');
         });
 
-        test('throws an error if selector is missing.', done => {
-          assert.that(() => {
-            listStore.removed({ modelName: 'foo' });
-          }).is.throwing('Selector is missing.');
-          done();
-        });
-
-        test('throws an error if callback is missing.', done => {
-          assert.that(() => {
-            listStore.removed({ modelName: 'foo', selector: 'bar' });
-          }).is.throwing('Callback is missing.');
-          done();
-        });
-
-        test('removes a single selected item.', done => {
+        test('removes a single selected item.', async () => {
           const payload = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []};
 
-          listStore.added({ modelName, payload }, errAdded => {
-            assert.that(errAdded).is.null();
+          await listStore.added({ modelName, payload });
 
-            const selector = { id: payload.id };
+          const selector = { id: payload.id };
 
-            listStore.removed({ modelName, selector }, errRemoved => {
-              assert.that(errRemoved).is.null();
+          await listStore.removed({ modelName, selector });
 
-              listStore.read({ modelType: 'lists', modelName, query: {}}, (err, stream) => {
-                assert.that(err).is.null();
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
 
-                toArray(stream, (errToArray, peerGroups) => {
-                  assert.that(errToArray).is.null();
-                  assert.that(peerGroups.length).is.equalTo(0);
-                  done();
-                });
-              });
-            });
-          });
+          assert.that(peerGroups.length).is.equalTo(0);
         });
 
-        test('removes multiple selected items.', done => {
+        test('removes multiple selected items.', async () => {
           const payloadFirst = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
                 payloadSecond = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: []};
 
-          listStore.added({ modelName, payload: payloadFirst }, errAddedFirst => {
-            assert.that(errAddedFirst).is.null();
+          await listStore.added({ modelName, payload: payloadFirst });
+          await listStore.added({ modelName, payload: payloadSecond });
 
-            listStore.added({ modelName, payload: payloadSecond }, errAddedSecond => {
-              assert.that(errAddedSecond).is.null();
+          const selector = { destination: 'Riva' };
 
-              const selector = { destination: 'Riva' };
+          await listStore.removed({ modelName, selector });
 
-              listStore.removed({ modelName, selector }, errRemoved => {
-                assert.that(errRemoved).is.null();
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
 
-                listStore.read({ modelType: 'lists', modelName, query: {}}, (err, stream) => {
-                  assert.that(err).is.null();
-
-                  toArray(stream, (errToArray, peerGroups) => {
-                    assert.that(errToArray).is.null();
-                    assert.that(peerGroups.length).is.equalTo(0);
-                    done();
-                  });
-                });
-              });
-            });
-          });
+          assert.that(peerGroups.length).is.equalTo(0);
         });
 
-        test('removes items selected by query.', done => {
+        test('removes items selected by query.', async () => {
           const payloadFirst = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
                 payloadSecond = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe', 'Jane Doe' ]};
 
-          listStore.added({ modelName, payload: payloadFirst }, errAddedFirst => {
-            assert.that(errAddedFirst).is.null();
+          await listStore.added({ modelName, payload: payloadFirst });
+          await listStore.added({ modelName, payload: payloadSecond });
 
-            listStore.added({ modelName, payload: payloadSecond }, errAddedSecond => {
-              assert.that(errAddedSecond).is.null();
+          const selector = { initiator: 'John Doe' };
 
-              const selector = { initiator: 'John Doe' };
+          await listStore.removed({ modelName, selector });
 
-              listStore.removed({ modelName, selector }, errRemoved => {
-                assert.that(errRemoved).is.null();
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
 
-                listStore.read({ modelType: 'lists', modelName, query: {}}, (err, stream) => {
-                  assert.that(err).is.null();
-
-                  toArray(stream, (errToArray, peerGroups) => {
-                    assert.that(errToArray).is.null();
-                    assert.that(peerGroups.length).is.equalTo(1);
-                    assert.that(peerGroups[0]).is.equalTo({
-                      id: payloadFirst.id,
-                      initiator: 'Jane Doe',
-                      destination: 'Riva',
-                      participants: []
-                    });
-                    done();
-                  });
-                });
-              });
-            });
+          assert.that(peerGroups.length).is.equalTo(1);
+          assert.that(peerGroups[0]).is.equalTo({
+            id: payloadFirst.id,
+            initiator: 'Jane Doe',
+            destination: 'Riva',
+            participants: []
           });
         });
       });
 
       suite('read', () => {
-        test('is a function.', done => {
+        test('is a function.', async () => {
           assert.that(listStore.read).is.ofType('function');
-          done();
         });
 
-        test('throws an error if options are missing.', done => {
-          assert.that(() => {
-            listStore.read();
-          }).is.throwing('Options are missing.');
-          done();
+        test('throws an error if model name is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.read({});
+          }).is.throwingAsync('Model name is missing.');
         });
 
-        test('throws an error if model name is missing.', done => {
-          assert.that(() => {
-            listStore.read({});
-          }).is.throwing('Model name is missing.');
-          done();
+        test('throws an error if query is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.read({ modelName: 'foo' });
+          }).is.throwingAsync('Query is missing.');
         });
 
-        test('throws an error if query is missing.', done => {
-          assert.that(() => {
-            listStore.read({ modelName: 'foo' });
-          }).is.throwing('Query is missing.');
-          done();
-        });
-
-        test('throws an error if callback is missing.', done => {
-          assert.that(() => {
-            listStore.read({ modelName: 'foo', query: {}});
-          }).is.throwing('Callback is missing.');
-          done();
-        });
-
-        test('reads items.', done => {
+        test('reads items.', async () => {
           const payloadFirst = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
                 payloadSecond = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe', 'Jane Doe' ]};
 
-          listStore.added({ modelName, payload: payloadFirst }, errAddedFirst => {
-            assert.that(errAddedFirst).is.null();
+          await listStore.added({ modelName, payload: payloadFirst });
+          await listStore.added({ modelName, payload: payloadSecond });
 
-            listStore.added({ modelName, payload: payloadSecond }, errAddedSecond => {
-              assert.that(errAddedSecond).is.null();
+          const query = {};
 
-              const query = {};
+          const stream = await listStore.read({ modelName, query });
+          const items = await toArray(stream);
 
-              listStore.read({ modelName, query }, (errRead, stream) => {
-                assert.that(errRead).is.null();
-
-                toArray(stream, (errToArray, items) => {
-                  assert.that(items.length).is.equalTo(2);
-                  assert.that(items[0]).is.equalTo(payloadFirst);
-                  assert.that(items[1]).is.equalTo(payloadSecond);
-                  done();
-                });
-              });
-            });
-          });
+          assert.that(items.length).is.equalTo(2);
+          assert.that(items[0]).is.equalTo(payloadFirst);
+          assert.that(items[1]).is.equalTo(payloadSecond);
         });
 
-        test('reads items by query.', done => {
+        test('reads items by query.', async () => {
           const payloadFirst = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
                 payloadSecond = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe', 'Jane Doe' ]};
 
-          listStore.added({ modelName, payload: payloadFirst }, errAddedFirst => {
-            assert.that(errAddedFirst).is.null();
+          await listStore.added({ modelName, payload: payloadFirst });
+          await listStore.added({ modelName, payload: payloadSecond });
 
-            listStore.added({ modelName, payload: payloadSecond }, errAddedSecond => {
-              assert.that(errAddedSecond).is.null();
+          const query = {
+            where: { initiator: 'Jane Doe' }
+          };
 
-              const query = {
-                where: { initiator: 'Jane Doe' }
-              };
+          const stream = await listStore.read({ modelName, query });
+          const items = await toArray(stream);
 
-              listStore.read({ modelName, query }, (errRead, stream) => {
-                assert.that(errRead).is.null();
-
-                toArray(stream, (errToArray, items) => {
-                  assert.that(items.length).is.equalTo(1);
-                  assert.that(items[0]).is.equalTo(payloadFirst);
-                  done();
-                });
-              });
-            });
-          });
+          assert.that(items.length).is.equalTo(1);
+          assert.that(items[0]).is.equalTo(payloadFirst);
         });
 
-        test('returns an empty list if no items are matched by query.', done => {
+        test('returns an empty list if no items are matched by query.', async () => {
           const payloadFirst = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
                 payloadSecond = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe', 'Jane Doe' ]};
 
-          listStore.added({ modelName, payload: payloadFirst }, errAddedFirst => {
-            assert.that(errAddedFirst).is.null();
+          await listStore.added({ modelName, payload: payloadFirst });
+          await listStore.added({ modelName, payload: payloadSecond });
 
-            listStore.added({ modelName, payload: payloadSecond }, errAddedSecond => {
-              assert.that(errAddedSecond).is.null();
+          const query = {
+            where: { initiator: 'Jessy Doe' }
+          };
 
-              const query = {
-                where: { initiator: 'Jessy Doe' }
-              };
+          const stream = await listStore.read({ modelName, query });
+          const items = await toArray(stream);
 
-              listStore.read({ modelName, query }, (errRead, stream) => {
-                assert.that(errRead).is.null();
-
-                toArray(stream, (errToArray, items) => {
-                  assert.that(items.length).is.equalTo(0);
-                  done();
-                });
-              });
-            });
-          });
+          assert.that(items.length).is.equalTo(0);
         });
       });
     });
@@ -676,114 +463,92 @@ const lists = function (options) {
         domainEvent = buildDomainEvent('planning', 'peerGroup', 'joined', { participant: 'Jane Doe' });
       });
 
-      test('add and update single item.', done => {
+      test('add and update single item.', async () => {
         const id = uuid();
 
-        async.series({
-          addAndUpdate (callback) {
-            modelStore.processEvents(domainEvent, [
-              buildModelEvent('lists', modelName, 'added', { payload: { id, initiator: 'Jane Doe', destination: 'Riva', participants: [], stars: 0 }}),
-              buildModelEvent('lists', modelName, 'updated', { selector: { id }, payload: { participants: { $add: 'Jane Doe' }}})
-            ], callback);
-          },
-          read (callback) {
-            modelStore.read({ modelType: 'lists', modelName }, (err, stream) => {
-              assert.that(err).is.null();
-              toArray(stream, (errToArray, peerGroups) => {
-                assert.that(errToArray).is.null();
-                assert.that(peerGroups).is.equalTo([
-                  { id, initiator: 'Jane Doe', destination: 'Riva', participants: [ 'Jane Doe' ], stars: 0 }
-                ]);
-                callback(null);
-              });
-            });
-          },
-          teardown (callback) {
-            modelStore.processEvents(domainEvent, [
-              buildModelEvent('lists', modelName, 'removed', { selector: {}})
-            ], callback);
-          }
-        }, done);
+        // Add and update.
+        await modelStore.processEvents(domainEvent, [
+          buildModelEvent('lists', modelName, 'added', { payload: { id, initiator: 'Jane Doe', destination: 'Riva', participants: [], stars: 0 }}),
+          buildModelEvent('lists', modelName, 'updated', { selector: { id }, payload: { participants: { $add: 'Jane Doe' }}})
+        ]);
+
+        // Read.
+        const stream = await modelStore.read({ modelType: 'lists', modelName });
+        const peerGroups = await toArray(stream);
+
+        assert.that(peerGroups).is.equalTo([
+          { id, initiator: 'Jane Doe', destination: 'Riva', participants: [ 'Jane Doe' ], stars: 0 }
+        ]);
+
+        // Teardown.
+        await modelStore.processEvents(domainEvent, [
+          buildModelEvent('lists', modelName, 'removed', { selector: {}})
+        ]);
       });
 
-      test('add, update and remove multiple items.', done => {
+      test('add, update and remove multiple items.', async () => {
         const id = [ uuid(), uuid(), uuid(), uuid(), uuid() ];
 
-        async.series({
-          addUpdateAndRemove (callback) {
-            modelStore.processEvents(domainEvent, [
-              buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], initiator: 'Jane Doe', destination: 'Riva', participants: [], stars: 0 }}),
-              buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], initiator: 'John Doe', destination: 'Sultan Saray', participants: [], stars: 0 }}),
-              buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], initiator: 'Jessica Doe', destination: 'Moulou', participants: [], stars: 0 }}),
-              buildModelEvent('lists', modelName, 'added', { payload: { id: id[3], initiator: 'James Doe', destination: 'Kurose', participants: [], stars: 0 }}),
-              buildModelEvent('lists', modelName, 'added', { payload: { id: id[4], initiator: 'Jeanette Doe', destination: 'Riva', participants: [], stars: 0 }}),
-              buildModelEvent('lists', modelName, 'updated', { selector: { destination: 'Riva' }, payload: { destination: 'Sultan Saray', stars: { $incrementBy: 2 }}}),
-              buildModelEvent('lists', modelName, 'updated', { selector: { initiator: 'Jessica Doe' }, payload: { destination: 'Sans', participants: { $add: 'Jim Doe' }}}),
-              buildModelEvent('lists', modelName, 'removed', { selector: { id: id[1] }})
-            ], callback);
-          },
-          read (callback) {
-            modelStore.read({ modelType: 'lists', modelName }, (err, stream) => {
-              assert.that(err).is.null();
-              toArray(stream, (errToArray, peerGroups) => {
-                assert.that(errToArray).is.null();
-                assert.that(peerGroups).is.equalTo([
-                  { id: id[0], initiator: 'Jane Doe', destination: 'Sultan Saray', participants: [], stars: 2 },
-                  { id: id[2], initiator: 'Jessica Doe', destination: 'Sans', participants: [ 'Jim Doe' ], stars: 0 },
-                  { id: id[3], initiator: 'James Doe', destination: 'Kurose', participants: [], stars: 0 },
-                  { id: id[4], initiator: 'Jeanette Doe', destination: 'Sultan Saray', participants: [], stars: 2 }
-                ]);
-                callback(null);
-              });
-            });
-          },
-          teardown (callback) {
-            modelStore.processEvents(domainEvent, [
-              buildModelEvent('lists', modelName, 'removed', { selector: {}})
-            ], callback);
-          }
-        }, done);
+        // Add, update and remove.
+        await modelStore.processEvents(domainEvent, [
+          buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], initiator: 'Jane Doe', destination: 'Riva', participants: [], stars: 0 }}),
+          buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], initiator: 'John Doe', destination: 'Sultan Saray', participants: [], stars: 0 }}),
+          buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], initiator: 'Jessica Doe', destination: 'Moulou', participants: [], stars: 0 }}),
+          buildModelEvent('lists', modelName, 'added', { payload: { id: id[3], initiator: 'James Doe', destination: 'Kurose', participants: [], stars: 0 }}),
+          buildModelEvent('lists', modelName, 'added', { payload: { id: id[4], initiator: 'Jeanette Doe', destination: 'Riva', participants: [], stars: 0 }}),
+          buildModelEvent('lists', modelName, 'updated', { selector: { destination: 'Riva' }, payload: { destination: 'Sultan Saray', stars: { $incrementBy: 2 }}}),
+          buildModelEvent('lists', modelName, 'updated', { selector: { initiator: 'Jessica Doe' }, payload: { destination: 'Sans', participants: { $add: 'Jim Doe' }}}),
+          buildModelEvent('lists', modelName, 'removed', { selector: { id: id[1] }})
+        ]);
+
+        // Read.
+        const stream = await modelStore.read({ modelType: 'lists', modelName });
+        const peerGroups = await toArray(stream);
+
+        assert.that(peerGroups).is.equalTo([
+          { id: id[0], initiator: 'Jane Doe', destination: 'Sultan Saray', participants: [], stars: 2 },
+          { id: id[2], initiator: 'Jessica Doe', destination: 'Sans', participants: [ 'Jim Doe' ], stars: 0 },
+          { id: id[3], initiator: 'James Doe', destination: 'Kurose', participants: [], stars: 0 },
+          { id: id[4], initiator: 'Jeanette Doe', destination: 'Sultan Saray', participants: [], stars: 2 }
+        ]);
+
+        // Teardown.
+        await modelStore.processEvents(domainEvent, [
+          buildModelEvent('lists', modelName, 'removed', { selector: {}})
+        ]);
       });
 
-      test('add and remove items to and from arrays.', done => {
+      test('add and remove items to and from arrays.', async () => {
         const id = [ uuid(), uuid(), uuid() ];
 
-        async.series({
-          addAndUpdate (callback) {
-            modelStore.processEvents(domainEvent, [
-              buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], participants: []}}),
-              buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], participants: [ 'John Doe' ]}}),
-              buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], participants: [ 'John Doe', 'Jennifer Doe' ]}}),
-              buildModelEvent('lists', modelName, 'updated', { selector: { id: id[0] }, payload: { participants: { $add: 'Jane Doe' }}}),
-              buildModelEvent('lists', modelName, 'updated', { selector: { id: id[1] }, payload: { participants: { $add: 'Jane Doe' }}}),
-              buildModelEvent('lists', modelName, 'updated', { selector: { id: id[1] }, payload: { participants: { $remove: 'John Doe' }}}),
-              buildModelEvent('lists', modelName, 'updated', { selector: { id: id[2] }, payload: { participants: { $remove: 'John Doe' }}})
-            ], callback);
-          },
-          read (callback) {
-            modelStore.read({
-              modelType: 'lists',
-              modelName
-            }, (err, stream) => {
-              assert.that(err).is.null();
+        // Add and update.
+        await modelStore.processEvents(domainEvent, [
+          buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], participants: []}}),
+          buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], participants: [ 'John Doe' ]}}),
+          buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], participants: [ 'John Doe', 'Jennifer Doe' ]}}),
+          buildModelEvent('lists', modelName, 'updated', { selector: { id: id[0] }, payload: { participants: { $add: 'Jane Doe' }}}),
+          buildModelEvent('lists', modelName, 'updated', { selector: { id: id[1] }, payload: { participants: { $add: 'Jane Doe' }}}),
+          buildModelEvent('lists', modelName, 'updated', { selector: { id: id[1] }, payload: { participants: { $remove: 'John Doe' }}}),
+          buildModelEvent('lists', modelName, 'updated', { selector: { id: id[2] }, payload: { participants: { $remove: 'John Doe' }}})
+        ]);
 
-              toArray(stream, (errToArray, peerGroups) => {
-                assert.that(errToArray).is.null();
-                assert.that(peerGroups).is.equalTo([
-                  { id: id[0], participants: [ 'Jane Doe' ]},
-                  { id: id[1], participants: [ 'Jane Doe' ]},
-                  { id: id[2], participants: [ 'Jennifer Doe' ]}
-                ]);
-                callback(null);
-              });
-            });
-          },
-          teardown (callback) {
-            modelStore.processEvents(domainEvent, [
-              buildModelEvent('lists', modelName, 'removed', { selector: {}})
-            ], callback);
-          }
-        }, done);
+        // Read.
+        const stream = await modelStore.read({
+          modelType: 'lists',
+          modelName
+        });
+        const peerGroups = await toArray(stream);
+
+        assert.that(peerGroups).is.equalTo([
+          { id: id[0], participants: [ 'Jane Doe' ]},
+          { id: id[1], participants: [ 'Jane Doe' ]},
+          { id: id[2], participants: [ 'Jennifer Doe' ]}
+        ]);
+
+        // Teardown.
+        await modelStore.processEvents(domainEvent, [
+          buildModelEvent('lists', modelName, 'removed', { selector: {}})
+        ]);
       });
     });
 
@@ -792,304 +557,255 @@ const lists = function (options) {
 
       const id = [ uuid(), uuid(), uuid() ];
 
-      const read = function (query, callback) {
-        modelStore.read({
+      const read = async function (query) {
+        const stream = await modelStore.read({
           modelType: 'lists',
           modelName,
           query
-        }, (err, stream) => {
-          assert.that(err).is.null();
-          toArray(stream, (errToArray, peerGroups) => {
-            if (errToArray) {
-              return callback(errToArray);
-            }
-            callback(peerGroups);
-          });
         });
+
+        const items = await toArray(stream);
+
+        return items;
       };
 
-      const readOne = function (query, callback) {
-        modelStore.readOne({
+      const readOne = async function (query) {
+        const item = await modelStore.readOne({
           modelType: 'lists',
           modelName,
           query
-        }, callback);
+        });
+
+        return item;
       };
 
-      setup(done => {
+      setup(async () => {
         domainEvent = buildDomainEvent('planning', 'peerGroup', 'joined', { participant: 'Jane Doe' });
 
-        modelStore.processEvents(domainEvent, [
+        await modelStore.processEvents(domainEvent, [
           buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], initiator: 'Jane Doe', destination: 'Riva', participants: [ 'Jane Doe' ], stars: 2 }}),
           buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe' ], stars: 0 }}),
           buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], initiator: 'Jennifer Doe', destination: 'Sultan Saray', participants: [ 'Jane Doe', 'Jennifer Doe' ], stars: 1 }})
-        ], done);
+        ]);
       });
 
-      teardown(done => {
-        modelStore.processEvents(domainEvent, [
+      teardown(async () => {
+        await modelStore.processEvents(domainEvent, [
           buildModelEvent('lists', modelName, 'removed', { selector: {}})
-        ], done);
+        ]);
       });
 
       suite('readOne', () => {
         suite('where', () => {
-          test('equal to.', done => {
-            readOne({
+          test('equal to.', async () => {
+            const peerGroup = await readOne({
               where: { stars: 0 }
-            }, (err, peerGroup) => {
-              assert.that(err).is.null();
-              assert.that(peerGroup.id).is.equalTo(id[1]);
-              done();
             });
+
+            assert.that(peerGroup.id).is.equalTo(id[1]);
           });
 
-          test('not found.', done => {
-            readOne({
-              where: { stars: 4 }
-            }, (err, item) => {
-              assert.that(err).is.not.null();
-              assert.that(err.message).is.equalTo('Item not found.');
-              assert.that(item).is.undefined();
-              done();
-            });
+          test('not found.', async () => {
+            await assert.that(async () => {
+              await readOne({
+                where: { stars: 4 }
+              });
+            }).is.throwingAsync('Item not found.');
           });
         });
       });
 
       suite('read', () => {
         suite('where', () => {
-          test('equal to.', done => {
-            read({
+          test('equal to.', async () => {
+            const peerGroups = await read({
               where: { stars: 1 }
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(1);
-              assert.that(peerGroups[0].id).is.equalTo(id[2]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(1);
+            assert.that(peerGroups[0].id).is.equalTo(id[2]);
           });
 
-          test('greather than.', done => {
-            read({
+          test('greather than.', async () => {
+            const peerGroups = await read({
               where: { stars: { $greaterThan: 1 }}
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(1);
-              assert.that(peerGroups[0].id).is.equalTo(id[0]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(1);
+            assert.that(peerGroups[0].id).is.equalTo(id[0]);
           });
 
-          test('less than.', done => {
-            read({
+          test('less than.', async () => {
+            const peerGroups = await read({
               where: { stars: { $lessThan: 1 }}
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(1);
-              assert.that(peerGroups[0].id).is.equalTo(id[1]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(1);
+            assert.that(peerGroups[0].id).is.equalTo(id[1]);
           });
 
-          test('greater than or equal to.', done => {
-            read({
+          test('greater than or equal to.', async () => {
+            const peerGroups = await read({
               where: { stars: { $greaterThanOrEqualTo: 1 }}
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(2);
-              assert.that(peerGroups[0].id).is.equalTo(id[0]);
-              assert.that(peerGroups[1].id).is.equalTo(id[2]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(2);
+            assert.that(peerGroups[0].id).is.equalTo(id[0]);
+            assert.that(peerGroups[1].id).is.equalTo(id[2]);
           });
 
-          test('less than or equal to.', done => {
-            read({
+          test('less than or equal to.', async () => {
+            const peerGroups = await read({
               where: { stars: { $lessThanOrEqualTo: 1 }}
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(2);
-              assert.that(peerGroups[0].id).is.equalTo(id[1]);
-              assert.that(peerGroups[1].id).is.equalTo(id[2]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(2);
+            assert.that(peerGroups[0].id).is.equalTo(id[1]);
+            assert.that(peerGroups[1].id).is.equalTo(id[2]);
           });
 
-          test('not equal to.', done => {
-            read({
+          test('not equal to.', async () => {
+            const peerGroups = await read({
               where: { stars: { $notEqualTo: 1 }}
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(2);
-              assert.that(peerGroups[0].id).is.equalTo(id[0]);
-              assert.that(peerGroups[1].id).is.equalTo(id[1]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(2);
+            assert.that(peerGroups[0].id).is.equalTo(id[0]);
+            assert.that(peerGroups[1].id).is.equalTo(id[1]);
           });
 
-          test('contains.', done => {
-            read({
+          test('contains.', async () => {
+            const peerGroups = await read({
               where: { participants: { $contains: 'Jane Doe' }}
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(2);
-              assert.that(peerGroups[0].id).is.equalTo(id[0]);
-              assert.that(peerGroups[1].id).is.equalTo(id[2]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(2);
+            assert.that(peerGroups[0].id).is.equalTo(id[0]);
+            assert.that(peerGroups[1].id).is.equalTo(id[2]);
           });
 
-          test('does not contain.', done => {
-            read({
+          test('does not contain.', async () => {
+            const peerGroups = await read({
               where: { participants: { $doesNotContain: 'Jane Doe' }}
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(1);
-              assert.that(peerGroups[0].id).is.equalTo(id[1]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(1);
+            assert.that(peerGroups[0].id).is.equalTo(id[1]);
           });
         });
 
         suite('order by', () => {
-          test('ascending.', done => {
-            read({
+          test('ascending.', async () => {
+            const peerGroups = await read({
               orderBy: { stars: 'ascending' }
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(3);
-              assert.that(peerGroups[0].id).is.equalTo(id[1]);
-              assert.that(peerGroups[1].id).is.equalTo(id[2]);
-              assert.that(peerGroups[2].id).is.equalTo(id[0]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(3);
+            assert.that(peerGroups[0].id).is.equalTo(id[1]);
+            assert.that(peerGroups[1].id).is.equalTo(id[2]);
+            assert.that(peerGroups[2].id).is.equalTo(id[0]);
           });
 
-          test('descending.', done => {
-            read({
+          test('descending.', async () => {
+            const peerGroups = await read({
               orderBy: { stars: 'descending' }
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(3);
-              assert.that(peerGroups[0].id).is.equalTo(id[0]);
-              assert.that(peerGroups[1].id).is.equalTo(id[2]);
-              assert.that(peerGroups[2].id).is.equalTo(id[1]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(3);
+            assert.that(peerGroups[0].id).is.equalTo(id[0]);
+            assert.that(peerGroups[1].id).is.equalTo(id[2]);
+            assert.that(peerGroups[2].id).is.equalTo(id[1]);
           });
         });
 
         suite('take', () => {
-          test('limits items.', done => {
-            read({
+          test('limits items.', async () => {
+            const peerGroups = await read({
               take: 1
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(1);
-              assert.that(peerGroups[0].id).is.equalTo(id[0]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(1);
+            assert.that(peerGroups[0].id).is.equalTo(id[0]);
           });
         });
 
         suite('skip', () => {
-          test('skips items.', done => {
-            read({
+          test('skips items.', async () => {
+            const peerGroups = await read({
               skip: 1,
               take: 1
-            }, peerGroups => {
-              assert.that(peerGroups.length).is.equalTo(1);
-              assert.that(peerGroups[0].id).is.equalTo(id[1]);
-              done();
             });
+
+            assert.that(peerGroups.length).is.equalTo(1);
+            assert.that(peerGroups[0].id).is.equalTo(id[1]);
           });
         });
       });
     });
 
     suite('updatePosition', () => {
-      test('is a function.', done => {
+      test('is a function.', async () => {
         assert.that(listStore.updatePosition).is.ofType('function');
-        done();
       });
 
-      test('throws an error if position is missing.', done => {
-        assert.that(() => {
-          listStore.updatePosition();
-        }).is.throwing('Position is missing.');
-        done();
-      });
-
-      test('throws an error if callback is missing.', done => {
-        assert.that(() => {
-          listStore.updatePosition(23);
-        }).is.throwing('Callback is missing.');
-        done();
+      test('throws an error if position is missing.', async () => {
+        await assert.that(async () => {
+          await listStore.updatePosition();
+        }).is.throwingAsync('Position is missing.');
       });
 
       suite('database', () => {
-        test('updates the event sequencer.', done => {
-          listStore.updatePosition(23, errUpdatePosition => {
-            assert.that(errUpdatePosition).is.null();
+        test('updates the event sequencer.', async () => {
+          await listStore.updatePosition(23);
 
-            simulateRestart((errSimulateRestart, other) => {
-              assert.that(errSimulateRestart).is.null();
+          const other = await simulateRestart();
 
-              assert.that(other.eventSequencer.models).is.equalTo({
-                lists: {
-                  [modelName]: { lastProcessedPosition: 23 }
-                }
-              });
-              done();
-            });
+          assert.that(other.eventSequencer.models).is.equalTo({
+            lists: {
+              [modelName]: { lastProcessedPosition: 23 }
+            }
           });
         });
 
-        test('does not update the event sequencer if the new position is less than the current one.', done => {
-          listStore.updatePosition(23, errUpdatePosition1 => {
-            assert.that(errUpdatePosition1).is.null();
+        test('does not update the event sequencer if the new position is less than the current one.', async () => {
+          await listStore.updatePosition(23);
+          await listStore.updatePosition(22);
 
-            listStore.updatePosition(22, errUpdatePosition2 => {
-              assert.that(errUpdatePosition2).is.null();
+          const other = await simulateRestart();
 
-              simulateRestart((errSimulateRestart, other) => {
-                assert.that(errSimulateRestart).is.null();
-
-                assert.that(other.eventSequencer.models).is.equalTo({
-                  lists: {
-                    [modelName]: { lastProcessedPosition: 23 }
-                  }
-                });
-                done();
-              });
-            });
+          assert.that(other.eventSequencer.models).is.equalTo({
+            lists: {
+              [modelName]: { lastProcessedPosition: 23 }
+            }
           });
         });
       });
 
       suite('in-memory', () => {
-        test('updates the event sequencer.', done => {
+        test('updates the event sequencer.', async () => {
           assert.that(eventSequencer.models).is.equalTo({
             lists: {
               [modelName]: { lastProcessedPosition: 0 }
             }
           });
 
-          listStore.updatePosition(23, err => {
-            assert.that(err).is.null();
-            assert.that(eventSequencer.models).is.equalTo({
-              lists: {
-                [modelName]: { lastProcessedPosition: 23 }
-              }
-            });
-            done();
+          await listStore.updatePosition(23);
+
+          assert.that(eventSequencer.models).is.equalTo({
+            lists: {
+              [modelName]: { lastProcessedPosition: 23 }
+            }
           });
         });
 
-        test('does not update the event sequencer if the new position is less than the current one.', done => {
-          listStore.updatePosition(23, errUpdatePosition1 => {
-            assert.that(errUpdatePosition1).is.null();
+        test('does not update the event sequencer if the new position is less than the current one.', async () => {
+          await listStore.updatePosition(23);
+          await listStore.updatePosition(22);
 
-            listStore.updatePosition(22, errUpdatePosition2 => {
-              assert.that(errUpdatePosition2).is.null();
-
-              assert.that(eventSequencer.models).is.equalTo({
-                lists: {
-                  [modelName]: { lastProcessedPosition: 23 }
-                }
-              });
-              done();
-            });
+          assert.that(eventSequencer.models).is.equalTo({
+            lists: {
+              [modelName]: { lastProcessedPosition: 23 }
+            }
           });
         });
       });

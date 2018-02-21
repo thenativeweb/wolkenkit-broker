@@ -13,33 +13,34 @@ const env = require('../../../helpers/env'),
 runIntegrationTests({
   ListStore,
   url: env.MONGO_URL_UNITS,
-  resetDatabase (callback) {
-    runfork({
-      path: path.join(__dirname, '..', '..', '..', 'helpers', 'runResetMongo.js'),
-      env: {
-        URL: env.MONGO_URL_UNITS
-      },
-      onExit (exitCode) {
-        if (exitCode > 0) {
-          return callback(new Error('Failed to reset MongoDB.'));
-        }
-        callback(null);
-      }
-    }, errfork => {
-      if (errfork) {
-        return callback(errfork);
+
+  async resetDatabase () {
+    await new Promise((resolve, reject) => {
+      try {
+        runfork({
+          path: path.join(__dirname, '..', '..', '..', 'helpers', 'runResetMongo.js'),
+          env: {
+            URL: env.MONGO_URL_UNITS
+          },
+          onExit (exitCode) {
+            if (exitCode > 0) {
+              return reject(new Error('Failed to reset MongoDB.'));
+            }
+            resolve();
+          }
+        });
+      } catch (ex) {
+        reject(ex);
       }
     });
   },
-  startContainer (callback) {
-    shell.exec('docker start mongodb-units', statusCode => {
-      if (statusCode) {
-        return callback(new Error(`Unexpected status code ${statusCode}.`));
-      }
-      waitForMongo({ url: env.MONGO_URL_UNITS }, callback);
-    });
+
+  async startContainer () {
+    shell.exec('docker start mongodb-units');
+    await waitForMongo({ url: env.MONGO_URL_UNITS });
   },
-  stopContainer () {
+
+  async stopContainer () {
     shell.exec('docker kill mongodb-units');
   }
 });

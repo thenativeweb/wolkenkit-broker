@@ -21,7 +21,6 @@
     }
   ],
   "dependencies": {
-    "async": "2.6.0",
     "commands-events": "1.0.1",
     "lodash": "4.17.5",
     "mongodb": "3.0.2",
@@ -38,6 +37,7 @@
   },
   "devDependencies": {
     "assertthat": "1.0.0",
+    "async-retry": "1.1.4",
     "hase": "1.0.1",
     "json-lines-client": "1.0.1",
     "limes": "1.0.1",
