@@ -1,6 +1,7 @@
 'use strict';
 
-const _ = require('lodash');
+const forEach = require('lodash/forEach'),
+      merge = require('lodash/merge');
 
 const translations = {
   selector: {
@@ -66,7 +67,7 @@ const translate = function (source, translationType) {
     const fieldValue = source[fieldName];
 
     if (fieldName === '$or' || fieldName === '$and') {
-      return _.merge(target, {
+      return merge(target, {
         [fieldName]: fieldValue.map(nonTranslatedFieldValue => translate.selector(nonTranslatedFieldValue))
       });
     }
@@ -83,12 +84,12 @@ const translate = function (source, translationType) {
         const translation = translations[translationType][firstFieldValueKey];
 
         if (translation) {
-          return _.merge(target, translation(fieldName, fieldValue[firstFieldValueKey]));
+          return merge(target, translation(fieldName, fieldValue[firstFieldValueKey]));
         }
       }
     }
 
-    _.merge(target, translations[translationType].default(fieldName, fieldValue));
+    merge(target, translations[translationType].default(fieldName, fieldValue));
   });
 
   return target;
@@ -124,7 +125,7 @@ translate.orderBy = function (orderBy) {
 
   const target = {};
 
-  _.forEach(orderBy, (value, key) => {
+  forEach(orderBy, (value, key) => {
     if (!mapping[value]) {
       throw new Error('Invalid order criteria.');
     }

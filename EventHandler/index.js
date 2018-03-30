@@ -1,88 +1,88 @@
 'use strict';
 
-const async = require('async');
-
 const createReadModelAggregate = require('./readModelAggregates/create'),
-      Services = require('./Services');
+      getServices = require('./services/get');
 
-const EventHandler = function (options) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.app) {
-    throw new Error('App is missing.');
-  }
-  if (!options.readModel) {
-    throw new Error('Read model is missing.');
-  }
-  if (!options.modelStore) {
-    throw new Error('Model store is missing.');
-  }
+class EventHandler {
+  constructor ({ app, readModel, modelStore }) {
+    if (!app) {
+      throw new Error('App is missing.');
+    }
+    if (!readModel) {
+      throw new Error('Read model is missing.');
+    }
+    if (!modelStore) {
+      throw new Error('Model store is missing.');
+    }
 
-  this.app = options.app;
-  this.readModel = options.readModel;
-  this.modelStore = options.modelStore;
+    this.app = app;
+    this.readModel = readModel;
+    this.modelStore = modelStore;
 
-  this.services = new Services({
-    app: options.app,
-    readModel: options.readModel,
-    modelStore: options.modelStore
-  });
+    this.logger = app.services.getLogger();
 
-  this.eventListeners = {};
-  Object.keys(options.readModel).forEach(modelType => {
-    Object.keys(options.readModel[modelType]).forEach(modelName => {
-      Object.keys(options.readModel[modelType][modelName].when).forEach(eventName => {
-        const eventListener = options.readModel[modelType][modelName].when[eventName];
+    this.eventListeners = {};
 
-        eventListener.modelType = modelType;
-        eventListener.modelName = modelName;
+    Object.keys(readModel).forEach(modelType => {
+      Object.keys(readModel[modelType]).forEach(modelName => {
+        Object.keys(readModel[modelType][modelName].when).forEach(eventName => {
+          const eventListener = readModel[modelType][modelName].when[eventName];
 
-        this.eventListeners[eventName] = this.eventListeners[eventName] || [];
-        this.eventListeners[eventName].push(eventListener);
+          eventListener.modelType = modelType;
+          eventListener.modelName = modelName;
+
+          this.eventListeners[eventName] = this.eventListeners[eventName] || [];
+          this.eventListeners[eventName].push(eventListener);
+        });
       });
     });
-  });
-};
+  }
 
-EventHandler.prototype.handle = function (domainEvent, callback) {
-  const eventName = `${domainEvent.context.name}.${domainEvent.aggregate.name}.${domainEvent.name}`;
-  const modelEvents = [];
+  async handle (domainEvent) {
+    if (!domainEvent) {
+      throw new Error('Domain event is missing.');
+    }
 
-  async.each(this.eventListeners[eventName], (eventListener, done) => {
-    const readModelAggregate = createReadModelAggregate({
-      readModel: this.readModel[eventListener.modelType][eventListener.modelName],
-      modelStore: this.modelStore,
-      modelType: eventListener.modelType,
-      modelName: eventListener.modelName,
-      domainEvent
-    });
+    const eventName = `${domainEvent.context.name}.${domainEvent.aggregate.name}.${domainEvent.name}`;
+    const modelEvents = [];
 
-    const mark = {
-      asDone () {
-        modelEvents.push(...readModelAggregate.uncommittedEvents);
-        process.nextTick(() => done(null));
-      },
-      asFailed (reason) {
-        process.nextTick(() => done(new Error(reason)));
-      }
+    if (!this.eventListeners[eventName]) {
+      return modelEvents;
+    }
+
+    domainEvent.fail = function (reason) {
+      throw new Error(reason);
     };
 
-    try {
-      if (eventListener.length === 4) {
-        eventListener(readModelAggregate, domainEvent, this.services, mark);
-      } else {
-        eventListener(readModelAggregate, domainEvent, mark);
+    const { app, readModel, modelStore } = this;
+
+    for (let i = 0; i < this.eventListeners[eventName].length; i++) {
+      const eventListener = this.eventListeners[eventName][i];
+      const { modelType, modelName } = eventListener;
+
+      const readModelAggregate = createReadModelAggregate({
+        readModel: readModel[eventListener.modelType][eventListener.modelName],
+        modelStore,
+        modelType,
+        modelName,
+        domainEvent
+      });
+
+      const services = getServices({ app, readModel, modelStore, modelType, modelName });
+
+      try {
+        await eventListener(readModelAggregate, domainEvent, services);
+      } catch (ex) {
+        this.logger.debug('Failed to handle event.', { err: ex });
+
+        throw ex;
       }
-    } catch (ex) {
-      process.nextTick(() => done(ex));
+
+      modelEvents.push(...readModelAggregate.uncommittedEvents);
     }
-  }, err => {
-    if (err) {
-      return callback(err);
-    }
-    callback(null, modelEvents);
-  });
-};
+
+    return modelEvents;
+  }
+}
 
 module.exports = EventHandler;

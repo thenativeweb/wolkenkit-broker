@@ -1,6 +1,6 @@
 'use strict';
 
-const _ = require('lodash');
+const flatten = require('lodash/flatten');
 
 const looksLikeARegex = function (value) {
   return value.startsWith('/') && value.endsWith('/');
@@ -15,7 +15,7 @@ const getCorsOrigin = function (value) {
     return value;
   }
 
-  const origins = _.flatten([ value ]).map(origin => {
+  const origins = flatten([ value ]).map(origin => {
     origin = origin.trim();
 
     if (looksLikeARegex(origin)) {

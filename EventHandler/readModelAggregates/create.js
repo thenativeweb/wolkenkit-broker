@@ -2,42 +2,41 @@
 
 const ListAggregate = require('./ListAggregate');
 
-const create = function (options) {
-  if (!options) {
-    throw new Error('Options are missing.');
-  }
-  if (!options.readModel) {
+const create = function ({ readModel, modelStore, modelType, modelName, domainEvent }) {
+  if (!readModel) {
     throw new Error('Read model is missing.');
   }
-  if (!options.modelStore) {
+  if (!modelStore) {
     throw new Error('Model store is missing.');
   }
-  if (!options.modelType) {
+  if (!modelType) {
     throw new Error('Model type is missing.');
   }
-  if (!options.modelName) {
+  if (!modelName) {
     throw new Error('Model name is missing.');
   }
 
-  switch (options.modelType) {
-    case 'lists':
-      if (options.domainEvent) {
+  switch (modelType) {
+    case 'lists': {
+      if (domainEvent) {
         return new ListAggregate.Writable({
-          readModel: options.readModel,
-          modelStore: options.modelStore,
-          modelName: options.modelName,
-          domainEvent: options.domainEvent,
+          readModel,
+          modelStore,
+          modelName,
+          domainEvent,
           uncommittedEvents: []
         });
       }
 
       return new ListAggregate.Readable({
-        readModel: options.readModel,
-        modelStore: options.modelStore,
-        modelName: options.modelName
+        readModel,
+        modelStore,
+        modelName
       });
-    default:
+    }
+    default: {
       throw new Error('Invalid operation.');
+    }
   }
 };
 

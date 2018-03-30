@@ -1,6 +1,6 @@
 'use strict';
 
-const fork = require('child_process').fork;
+const { fork } = require('child_process');
 
 let appProcess;
 
@@ -22,21 +22,18 @@ const stop = function () {
   appProcess = undefined;
 };
 
-const runApp = function (options, callback) {
+const runApp = async function (options) {
   if (!options) {
     throw new Error('Options are missing.');
   }
   if (!options.app) {
     throw new Error('App is missing.');
   }
-  if (!callback) {
-    throw new Error('Callback is missing.');
-  }
 
   options.env = options.env || {};
 
   if (appProcess) {
-    return callback(new Error('App has already been started.'));
+    throw new Error('App has already been started.');
   }
 
   appProcess = fork(options.app, {
@@ -46,9 +43,9 @@ const runApp = function (options, callback) {
   process.on('SIGINT', cleanUpAndExit);
   process.on('SIGTERM', cleanUpAndExit);
 
-  setTimeout(() => {
-    callback(null, stop);
-  }, 2 * 1000);
+  await new Promise(resolve => setTimeout(resolve, 2 * 1000));
+
+  return stop;
 };
 
 module.exports = runApp;

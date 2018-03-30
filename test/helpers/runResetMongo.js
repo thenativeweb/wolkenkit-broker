@@ -1,38 +1,28 @@
 'use strict';
 
-const async = require('async'),
-      MongoClient = require('mongodb').MongoClient,
+const { MongoClient } = require('mongodb'),
+      { parse } = require('mongodb-uri'),
       processenv = require('processenv');
 
 const url = processenv('URL');
 
-/* eslint-disable no-process-exit */
-/* eslint-disable id-length */
-MongoClient.connect(url, { w: 1 }, (errConnect, db) => {
+(async () => {
+  /* eslint-disable id-length */
+  const client = await MongoClient.connect(url, { w: 1 });
   /* eslint-enable id-length */
-  db.collections((errCollections, collections) => {
-    if (errCollections) {
-      process.exit(1);
+
+  const db = await client.db(parse(url).database);
+  const collections = await db.collections();
+
+  for (let i = 0; i < collections.length; i++) {
+    const collection = collections[i];
+
+    if (collection.collectionName.startsWith('system')) {
+      continue;
     }
 
-    async.each(collections, (collection, done) => {
-      if (collection.collectionName.startsWith('system')) {
-        return done(null);
-      }
-      collection.drop(done);
-    }, err => {
-      if (err) {
-        process.exit(1);
-      }
+    await collection.drop();
+  }
 
-      db.close(errClose => {
-        if (errClose) {
-          process.exit(1);
-        }
-
-        process.exit(0);
-      });
-    });
-  });
-});
-/* eslint-enable no-process-exit */
+  await client.close();
+})();
