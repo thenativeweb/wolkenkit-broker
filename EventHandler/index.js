@@ -25,8 +25,8 @@ class EventHandler {
 
     Object.keys(readModel).forEach(modelType => {
       Object.keys(readModel[modelType]).forEach(modelName => {
-        Object.keys(readModel[modelType][modelName].when).forEach(eventName => {
-          const eventListener = readModel[modelType][modelName].when[eventName];
+        Object.keys(readModel[modelType][modelName].projections).forEach(eventName => {
+          const eventListener = readModel[modelType][modelName].projections[eventName];
 
           eventListener.modelType = modelType;
           eventListener.modelName = modelName;

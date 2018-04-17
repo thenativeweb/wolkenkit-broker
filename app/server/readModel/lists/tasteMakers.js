@@ -5,7 +5,7 @@ const fields = {
   count: { initialState: 0 }
 };
 
-const when = {
+const projections = {
   async 'planning.peerGroup.started' (tasteMakers, event) {
     try {
       await tasteMakers.readOne({
@@ -39,4 +39,4 @@ const when = {
   }
 };
 
-module.exports = { fields, when };
+module.exports = { fields, projections };

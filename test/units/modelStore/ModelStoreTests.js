@@ -5,7 +5,7 @@ const { EventEmitter } = require('events'),
 
 const assert = require('assertthat');
 
-const buildDomainEvent = require('../../helpers/buildEvent'),
+const buildDomainEvent = require('../../shared/buildEvent'),
       buildModelEvent = require('./buildModelEvent'),
       EventSequencer = require('../../../eventSequencer/EventSequencer'),
       ModelStore = require('../../../modelStore/ModelStore');

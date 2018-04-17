@@ -7,18 +7,18 @@ const assert = require('assertthat'),
       uuid = require('uuidv4'),
       WolkenkitApplication = require('wolkenkit-application');
 
-const buildEvent = require('../../helpers/buildEvent'),
-      env = require('../../helpers/env'),
+const buildEvent = require('../../shared/buildEvent'),
+      env = require('../../shared/env'),
       EventHandler = require('../../../EventHandler'),
       EventSequencer = require('../../../eventSequencer/EventSequencer'),
       ListStore = require('../../../modelStoreMongoDb/ListStore'),
       ModelStore = require('../../../modelStore/ModelStore');
 
 const app = tailwind.createApp({
-  keys: path.join(__dirname, '..', '..', 'keys'),
+  keys: path.join(__dirname, '..', '..', 'shared', 'keys'),
   identityProvider: {
     name: 'auth.wolkenkit.io',
-    certificate: path.join(__dirname, '..', '..', 'keys', 'certificate.pem')
+    certificate: path.join(__dirname, '..', '..', 'shared', 'keys', 'certificate.pem')
   }
 });
 

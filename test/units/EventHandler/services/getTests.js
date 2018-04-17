@@ -10,10 +10,10 @@ const getServices = require('../../../../EventHandler/services/get'),
       ModelStore = require('../../../../modelStore/ModelStore');
 
 const app = tailwind.createApp({
-  keys: path.join(__dirname, '..', '..', '..', 'keys'),
+  keys: path.join(__dirname, '..', '..', '..', 'shared', 'keys'),
   identityProvider: {
     name: 'auth.wolkenkit.io',
-    certificate: path.join(__dirname, '..', '..', '..', 'keys', 'certificate.pem')
+    certificate: path.join(__dirname, '..', '..', '..', 'shared', 'keys', 'certificate.pem')
   }
 });
 

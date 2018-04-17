@@ -10,7 +10,7 @@ const assert = require('assertthat'),
       sha1 = require('sha1'),
       uuid = require('uuidv4');
 
-const env = require('../../../helpers/env'),
+const env = require('../../../shared/env'),
       EventSequencer = require('../../../../eventSequencer/EventSequencer'),
       ListStore = require('../../../../modelStoreMongoDb/ListStore');
 
@@ -41,7 +41,7 @@ suite('ListStore', () => {
     await new Promise((resolve, reject) => {
       try {
         runfork({
-          path: path.join(__dirname, '..', '..', '..', 'helpers', 'runResetMongo.js'),
+          path: path.join(__dirname, '..', '..', '..', 'shared', 'runResetMongo.js'),
           env: {
             URL: env.MONGO_URL_UNITS
           },

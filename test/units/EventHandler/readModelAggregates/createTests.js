@@ -3,7 +3,7 @@
 const assert = require('assertthat'),
       uuid = require('uuidv4');
 
-const buildEvent = require('../../../helpers/buildEvent'),
+const buildEvent = require('../../../shared/buildEvent'),
       create = require('../../../../EventHandler/readModelAggregates/create'),
       ListAggregate = require('../../../../EventHandler/readModelAggregates/ListAggregate');
 

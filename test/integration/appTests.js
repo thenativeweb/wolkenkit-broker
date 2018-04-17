@@ -4,7 +4,7 @@ const path = require('path'),
       util = require('util');
 
 const assert = require('assertthat'),
-      EventStore = require('sparbuch/lib/postgres/Sparbuch'),
+      EventStore = require('wolkenkit-eventstore/dist/postgres/Eventstore'),
       hase = require('hase'),
       jsonLinesClient = require('json-lines-client'),
       request = require('superagent'),
@@ -12,13 +12,13 @@ const assert = require('assertthat'),
       shell = require('shelljs'),
       uuid = require('uuidv4');
 
-const buildCommand = require('../helpers/buildCommand'),
-      buildEvent = require('../helpers/buildEvent'),
-      env = require('../helpers/env'),
-      issueToken = require('../helpers/issueToken'),
-      waitForMongo = require('../helpers/waitForMongo'),
-      waitForPostgres = require('../helpers/waitForPostgres'),
-      waitForRabbitMq = require('../helpers/waitForRabbitMq');
+const buildCommand = require('../shared/buildCommand'),
+      buildEvent = require('../shared/buildEvent'),
+      env = require('../shared/env'),
+      issueToken = require('../shared/issueToken'),
+      waitForMongo = require('../shared/waitForMongo'),
+      waitForPostgres = require('../shared/waitForPostgres'),
+      waitForRabbitMq = require('../shared/waitForRabbitMq');
 
 const sleep = util.promisify(setTimeout);
 
@@ -157,7 +157,7 @@ suite('integrationTests', function () {
 
     await new Promise((resolve, reject) => {
       runfork({
-        path: path.join(__dirname, '..', 'helpers', 'runResetMongo.js'),
+        path: path.join(__dirname, '..', 'shared', 'runResetMongo.js'),
         env: {
           URL: env.MONGO_URL_INTEGRATION
         },
@@ -172,7 +172,7 @@ suite('integrationTests', function () {
 
     await new Promise((resolve, reject) => {
       runfork({
-        path: path.join(__dirname, '..', 'helpers', 'runResetPostgres.js'),
+        path: path.join(__dirname, '..', 'shared', 'runResetPostgres.js'),
         env: {
           NAMESPACE: namespace,
           URL: env.POSTGRES_URL_INTEGRATION
@@ -189,7 +189,7 @@ suite('integrationTests', function () {
     stopApp = runfork({
       path: app,
       env: {
-        API_KEYS: path.join(__dirname, '..', 'keys'),
+        API_KEYS: path.join(__dirname, '..', 'shared', 'keys'),
         API_HOST: 'localhost',
         API_PORT: 3000,
         API_CORS_ORIGIN: '*',
@@ -198,7 +198,7 @@ suite('integrationTests', function () {
         EVENTBUS_URL: env.RABBITMQ_URL_INTEGRATION,
         EVENTSTORE_TYPE: 'postgres',
         EVENTSTORE_URL: env.POSTGRES_URL_INTEGRATION,
-        IDENTITYPROVIDER_CERTIFICATE: path.join(__dirname, '..', 'keys'),
+        IDENTITYPROVIDER_CERTIFICATE: path.join(__dirname, '..', 'shared', 'keys'),
         IDENTITYPROVIDER_NAME: 'auth.wolkenkit.io',
         LISTSTORE_URL: env.MONGO_URL_INTEGRATION,
         PROFILING_HOST: 'localhost',

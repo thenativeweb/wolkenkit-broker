@@ -5,7 +5,7 @@ const stream = require('stream');
 const assert = require('assertthat'),
       uuid = require('uuidv4');
 
-const buildEvent = require('../../../helpers/buildEvent'),
+const buildEvent = require('../../../shared/buildEvent'),
       ListAggregate = require('../../../../EventHandler/readModelAggregates/ListAggregate');
 
 const PassThrough = stream.PassThrough;

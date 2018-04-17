@@ -6,7 +6,7 @@ const fields = {
   participants: { initialState: []}
 };
 
-const when = {
+const projections = {
   'planning.peerGroup.started' (peerGroups, event) {
     peerGroups.add({
       initiator: event.data.initiator,
@@ -34,4 +34,4 @@ const when = {
   }
 };
 
-module.exports = { fields, when };
+module.exports = { fields, projections };

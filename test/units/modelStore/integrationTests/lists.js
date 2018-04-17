@@ -6,7 +6,7 @@ const assert = require('assertthat'),
       toArray = require('streamtoarray'),
       uuid = require('uuidv4');
 
-const buildDomainEvent = require('../../../helpers/buildEvent'),
+const buildDomainEvent = require('../../../shared/buildEvent'),
       buildModelEvent = require('../buildModelEvent'),
       EventSequencer = require('../../../../eventSequencer/EventSequencer'),
       ModelStore = require('../../../../modelStore/ModelStore');

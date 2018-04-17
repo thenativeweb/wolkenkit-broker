@@ -2,7 +2,7 @@
 
 const assert = require('assertthat');
 
-const buildEvent = require('../../helpers/buildEvent'),
+const buildEvent = require('../../shared/buildEvent'),
       EventSequencer = require('../../../eventSequencer/EventSequencer');
 
 suite('EventSequencer', () => {
