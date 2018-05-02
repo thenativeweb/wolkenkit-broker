@@ -87,5 +87,10 @@ const eventSequencer = require('./eventSequencer'),
     readModel: application.configuration.readModel
   }));
 
+  await app.status.use(new app.wires.status.http.Server({
+    port: app.env('STATUS_PORT'),
+    corsOrigin: app.env('STATUS_CORS_ORIGIN')
+  }));
+
   logic({ app, eventSequencer, eventStore, modelStore, readModel: application.readModel });
 })();
