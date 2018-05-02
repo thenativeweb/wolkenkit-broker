@@ -202,7 +202,9 @@ suite('integrationTests', function () {
         IDENTITYPROVIDER_NAME: 'auth.wolkenkit.io',
         LISTSTORE_URL: env.MONGO_URL_INTEGRATION,
         PROFILING_HOST: 'localhost',
-        PROFILING_PORT: 8125
+        PROFILING_PORT: 8125,
+        STATUS_PORT: 3001,
+        STATUS_CORS_ORIGIN: '*'
       }
     });
 
@@ -920,6 +922,14 @@ suite('integrationTests', function () {
         assert.that(model[0].initiator).is.equalTo('Jane Doe');
         assert.that(model[1].initiator).is.equalTo('John Doe');
         assert.that(model[2].initiator).is.equalTo('Jenny Doe');
+      });
+    });
+
+    suite('status api', () => {
+      test('answers with api version v1.', async () => {
+        const res = await request.get('http://localhost:3001/v1/status');
+
+        assert.that(res.body).is.equalTo({ api: 'v1' });
       });
     });
   });

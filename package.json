@@ -22,16 +22,16 @@
   ],
   "dependencies": {
     "commands-events": "1.0.1",
-    "lodash": "4.17.5",
-    "mongodb": "3.0.6",
+    "lodash": "4.17.10",
+    "mongodb": "3.0.7",
     "mongodb-uri": "0.9.7",
     "processenv": "1.0.0",
     "sha1": "1.1.1",
     "streamtoarray": "1.0.0",
-    "tailwind": "2.0.4",
+    "tailwind": "2.1.0",
     "uuidv4": "1.0.0",
     "wolkenkit-application": "2.0.0",
-    "wolkenkit-eventstore": "2.3.0"
+    "wolkenkit-eventstore": "2.3.1"
   },
   "devDependencies": {
     "amqplib": "0.5.2",
@@ -46,7 +46,7 @@
     "roboter": "1.0.2",
     "runfork": "1.0.3",
     "shelljs": "0.8.1",
-    "superagent": "3.8.2"
+    "superagent": "3.8.3"
   },
   "scripts": {
     "build": "docker build -t thenativeweb/wolkenkit-broker ."
