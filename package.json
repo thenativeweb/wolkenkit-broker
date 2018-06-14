@@ -21,31 +21,31 @@
     }
   ],
   "dependencies": {
-    "commands-events": "1.0.1",
+    "commands-events": "1.0.3",
     "lodash": "4.17.10",
-    "mongodb": "3.0.7",
+    "mongodb": "3.0.10",
     "mongodb-uri": "0.9.7",
-    "processenv": "1.0.0",
+    "processenv": "1.0.1",
     "sha1": "1.1.1",
     "streamtoarray": "1.0.0",
-    "tailwind": "2.1.0",
-    "uuidv4": "1.0.0",
-    "wolkenkit-application": "2.0.0",
-    "wolkenkit-eventstore": "2.3.1"
+    "tailwind": "2.1.1",
+    "uuidv4": "1.0.1",
+    "wolkenkit-application": "2.0.2",
+    "wolkenkit-eventstore": "2.4.1"
   },
   "devDependencies": {
     "amqplib": "0.5.2",
     "assertthat": "1.0.0",
     "async-retry": "1.2.1",
-    "hase": "1.0.2",
+    "hase": "1.0.3",
     "json-lines-client": "1.0.1",
     "limes": "1.0.1",
-    "pg": "7.4.1",
+    "pg": "7.4.3",
     "pg-connection-string": "2.0.0",
     "record-stdstreams": "1.0.0",
-    "roboter": "1.0.2",
+    "roboter": "1.0.4",
     "runfork": "1.0.3",
-    "shelljs": "0.8.1",
+    "shelljs": "0.8.2",
     "superagent": "3.8.3"
   },
   "scripts": {
