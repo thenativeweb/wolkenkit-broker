@@ -1,6 +1,7 @@
 'use strict';
 
-const shell = require('shelljs');
+const oneLine = require('common-tags/lib/oneLine'),
+      shell = require('shelljs');
 
 const env = require('../shared/env'),
       waitForMongo = require('../shared/waitForMongo'),
@@ -8,9 +9,35 @@ const env = require('../shared/env'),
       waitForRabbitMq = require('../shared/waitForRabbitMq');
 
 const pre = async function () {
-  shell.exec('docker run -d -p 5673:5672 --name rabbitmq-units rabbitmq:3.6.6-alpine');
-  shell.exec('docker run -d -p 27018:27017 --name mongodb-units mongo:3.4.2');
-  shell.exec('docker run -d -p 5433:5432 -e POSTGRES_USER=wolkenkit -e POSTGRES_PASSWORD=wolkenkit -e POSTGRES_DB=wolkenkit --name postgres-units postgres:9.6.4-alpine');
+  shell.exec(oneLine`
+    docker run
+      -d
+      -p 5673:5672
+      -e RABBITMQ_DEFAULT_USER=wolkenkit
+      -e RABBITMQ_DEFAULT_PASS=wolkenkit
+      --name rabbitmq-units
+      thenativeweb/wolkenkit-rabbitmq:latest
+  `);
+  shell.exec(oneLine`
+    docker run
+      -d
+      -p 27018:27017
+      -e MONGODB_DATABASE=wolkenkit
+      -e MONGODB_USER=wolkenkit
+      -e MONGODB_PASS=wolkenkit
+      --name mongodb-units
+      thenativeweb/wolkenkit-mongodb:latest
+  `);
+  shell.exec(oneLine`
+    docker run
+      -d
+      -p 5433:5432
+      -e POSTGRES_DB=wolkenkit
+      -e POSTGRES_USER=wolkenkit
+      -e POSTGRES_PASSWORD=wolkenkit
+      --name postgres-units
+      thenativeweb/wolkenkit-postgres:latest
+  `);
 
   await waitForRabbitMq({ url: env.RABBITMQ_URL_UNITS });
   await waitForMongo({ url: env.MONGO_URL_UNITS });
