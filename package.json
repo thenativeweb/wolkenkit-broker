@@ -1,6 +1,6 @@
 {
   "name": "wolkenkit-broker",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "wolkenkit-broker is the public API server of wolkenkit.",
   "contributors": [
     {
