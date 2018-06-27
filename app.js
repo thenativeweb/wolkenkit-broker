@@ -98,6 +98,6 @@ const loggerSystem = flaschenpost.getLogger();
 
     logic({ app, eventSequencer, eventStore, modelStore, readModel: application.readModel });
   } catch (ex) {
-    loggerSystem.fatal(ex.message);
+    loggerSystem.fatal('An unexpected error occured.', { err: ex });
   }
 })();
