@@ -99,5 +99,9 @@ const loggerSystem = flaschenpost.getLogger();
     logic({ app, eventSequencer, eventStore, modelStore, readModel: application.readModel });
   } catch (ex) {
     loggerSystem.fatal('An unexpected error occured.', { err: ex });
+
+    /* eslint-disable no-process-exit */
+    process.exit(1);
+    /* eslint-enable no-process-exit */
   }
 })();
