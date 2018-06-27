@@ -22,6 +22,7 @@
   ],
   "dependencies": {
     "commands-events": "1.0.3",
+    "flaschenpost": "1.1.1",
     "lodash": "4.17.10",
     "mongodb": "3.0.10",
     "mongodb-uri": "0.9.7",
