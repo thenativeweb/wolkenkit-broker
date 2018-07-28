@@ -43,7 +43,7 @@ class ListStore extends EventEmitter {
 
     /* eslint-disable id-length */
     const client = await retry(async () => {
-      const connection = await MongoClient.connect(this.url, { w: 1 });
+      const connection = await MongoClient.connect(this.url, { w: 1, useNewUrlParser: true });
 
       return connection;
     });

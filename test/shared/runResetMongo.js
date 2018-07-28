@@ -8,7 +8,7 @@ const url = processenv('URL');
 
 (async () => {
   /* eslint-disable id-length */
-  const client = await MongoClient.connect(url, { w: 1 });
+  const client = await MongoClient.connect(url, { w: 1, useNewUrlParser: true });
   /* eslint-enable id-length */
 
   const db = await client.db(parse(url).database);

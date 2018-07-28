@@ -73,7 +73,7 @@ suite('ListStore', () => {
   suite('initialize', () => {
     test('creates collections and indexes.', async () => {
       /* eslint-disable id-length */
-      const client = await MongoClient.connect(url, { w: 1 });
+      const client = await MongoClient.connect(url, { w: 1, useNewUrlParser: true });
       const db = await client.db(parse(url).database);
       /* eslint-enable id-length */
 
