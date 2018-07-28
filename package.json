@@ -33,7 +33,7 @@
     "tailwind": "2.2.0",
     "uuidv4": "1.0.1",
     "wolkenkit-application": "2.0.2",
-    "wolkenkit-eventstore": "2.4.1"
+    "wolkenkit-eventstore": "2.5.0"
   },
   "devDependencies": {
     "amqplib": "0.5.2",
