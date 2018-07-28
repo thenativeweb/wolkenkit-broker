@@ -21,6 +21,7 @@
     }
   ],
   "dependencies": {
+    "async-retry": "1.2.1",
     "commands-events": "1.0.3",
     "flaschenpost": "1.1.1",
     "lodash": "4.17.10",
@@ -37,7 +38,6 @@
   "devDependencies": {
     "amqplib": "0.5.2",
     "assertthat": "1.0.0",
-    "async-retry": "1.2.1",
     "common-tags": "1.8.0",
     "hase": "1.0.3",
     "json-lines-client": "1.0.1",

@@ -7,6 +7,7 @@ const cloneDeep = require('lodash/cloneDeep'),
       mongodbUri = require('mongodb-uri'),
       { MongoClient } = require('mongodb'),
       omit = require('lodash/omit'),
+      retry = require('async-retry'),
       sha1 = require('sha1');
 
 const translate = require('./translate');
@@ -41,7 +42,11 @@ class ListStore extends EventEmitter {
     this.modelNames = Object.keys(readModel);
 
     /* eslint-disable id-length */
-    const client = await MongoClient.connect(this.url, { w: 1 });
+    const client = await retry(async () => {
+      const connection = await MongoClient.connect(this.url, { w: 1 });
+
+      return connection;
+    });
     /* eslint-enable id-length */
 
     client.on('close', () => {
