@@ -2,17 +2,23 @@
 
 const path = require('path');
 
-const assert = require('assertthat'),
-      WolkenkitApplication = require('wolkenkit-application');
+const applicationManager = require('wolkenkit-application'),
+      assert = require('assertthat');
 
 const getApp = require('../../../../EventHandler/services/getApp'),
       ModelStore = require('../../../../modelStore/ModelStore');
 
-const { readModel } = new WolkenkitApplication(path.join(__dirname, '..', '..', '..', '..', 'app'));
-
 const modelStore = new ModelStore();
 
 suite('getApp', () => {
+  let readModel;
+
+  suiteSetup(async () => {
+    readModel = (await applicationManager.load({
+      directory: path.join(__dirname, '..', '..', '..', '..', 'app')
+    })).readModel;
+  });
+
   test('is a function.', async () => {
     assert.that(getApp).is.ofType('function');
   });

@@ -2,9 +2,9 @@
 
 const path = require('path');
 
-const assert = require('assertthat'),
-      tailwind = require('tailwind'),
-      WolkenkitApplication = require('wolkenkit-application');
+const applicationManager = require('wolkenkit-application'),
+      assert = require('assertthat'),
+      tailwind = require('tailwind');
 
 const getServices = require('../../../../EventHandler/services/get'),
       ModelStore = require('../../../../modelStore/ModelStore');
@@ -17,13 +17,19 @@ const app = tailwind.createApp({
   }
 });
 
-const { readModel } = new WolkenkitApplication(path.join(__dirname, '..', '..', '..', '..', 'app'));
-
 const modelStore = new ModelStore();
 const modelType = 'lists';
 const modelName = 'peerGroups';
 
 suite('getServices', () => {
+  let readModel;
+
+  suiteSetup(async () => {
+    readModel = (await applicationManager.load({
+      directory: path.join(__dirname, '..', '..', '..', '..', 'app')
+    })).readModel;
+  });
+
   test('is a function.', async () => {
     assert.that(getServices).is.ofType('function');
   });

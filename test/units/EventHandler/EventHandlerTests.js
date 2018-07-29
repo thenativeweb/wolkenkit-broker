@@ -2,10 +2,10 @@
 
 const path = require('path');
 
-const assert = require('assertthat'),
+const applicationManager = require('wolkenkit-application'),
+      assert = require('assertthat'),
       tailwind = require('tailwind'),
-      uuid = require('uuidv4'),
-      WolkenkitApplication = require('wolkenkit-application');
+      uuid = require('uuidv4');
 
 const buildEvent = require('../../shared/buildEvent'),
       env = require('../../shared/env'),
@@ -22,11 +22,16 @@ const app = tailwind.createApp({
   }
 });
 
-const readModel = new WolkenkitApplication(path.join(__dirname, '..', '..', '..', 'app')).readModel;
-
 suite('EventHandler', () => {
   let eventSequencer,
-      modelStore;
+      modelStore,
+      readModel;
+
+  suiteSetup(async () => {
+    readModel = (await applicationManager.load({
+      directory: path.join(__dirname, '..', '..', '..', 'app')
+    })).readModel;
+  });
 
   setup(async () => {
     eventSequencer = new EventSequencer();

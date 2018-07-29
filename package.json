@@ -32,7 +32,7 @@
     "streamtoarray": "1.0.0",
     "tailwind": "2.2.0",
     "uuidv4": "1.0.1",
-    "wolkenkit-application": "2.0.2",
+    "wolkenkit-application": "3.0.0",
     "wolkenkit-eventstore": "2.5.0"
   },
   "devDependencies": {
