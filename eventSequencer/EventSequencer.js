@@ -67,6 +67,10 @@ class EventSequencer {
       });
     });
 
+    if (lowestProcessedPosition === undefined) {
+      throw new Error('Failed to get lowest processed position.');
+    }
+
     return lowestProcessedPosition;
   }
 
@@ -79,8 +83,15 @@ class EventSequencer {
       return { type: 'forward' };
     }
 
-    const lastProcessedPosition = this.getLowestProcessedPosition(),
-          missingEvents = domainEvent.metadata.position - (lastProcessedPosition + 1);
+    let lastProcessedPosition;
+
+    try {
+      lastProcessedPosition = this.getLowestProcessedPosition();
+    } catch (ex) {
+      return { type: 'forward' };
+    }
+
+    const missingEvents = domainEvent.metadata.position - (lastProcessedPosition + 1);
 
     if (missingEvents === 0) {
       return { type: 'proceed' };

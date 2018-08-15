@@ -255,6 +255,14 @@ suite('EventSequencer', () => {
           type: 'forward'
         });
       });
+
+      test('if getLowestProcessedPosition throws an error.', async () => {
+        const strategy = eventSequencer.getStrategyFor(eventStarted);
+
+        assert.that(strategy).is.equalTo({
+          type: 'forward'
+        });
+      });
     });
 
     suite('returns replay strategy', () => {
