@@ -135,6 +135,23 @@ class ListStore extends EventEmitter {
     Reflect.deleteProperty(payload, '_id');
   }
 
+  async upserted ({ modelName, selector, payload }) {
+    if (!modelName) {
+      throw new Error('Model name is missing.');
+    }
+    if (!selector) {
+      throw new Error('Selector is missing.');
+    }
+    if (!payload) {
+      throw new Error('Payload is missing.');
+    }
+
+    const translatedPayload = translate.payload(payload),
+          translatedSelector = translate.selector(selector);
+
+    await this.collections[modelName].updateMany(translatedSelector, translatedPayload, { upsert: true });
+  }
+
   async updated ({ modelName, selector, payload }) {
     if (!modelName) {
       throw new Error('Model name is missing.');

@@ -112,6 +112,33 @@ class Writable extends Readable {
     this.publishEvent('added', { payload });
   }
 
+  upsert ({ where, set }) {
+    if (!where) {
+      throw new Error('Where is missing.');
+    }
+    if (!set) {
+      throw new Error('Set is missing.');
+    }
+    if (Object.keys(set).length === 0) {
+      throw new Error('Set must not be empty.');
+    }
+
+    // If there is no id provided in 'set' use the id from 'where'. Else use the
+    // id of the aggregate.
+    set.id = set.id || where.id || this.domainEvent.aggregate.id;
+
+    // Copied from 'add' - is it needed?
+    set.isAuthorized = merge(
+      {},
+      this.domainEvent.metadata.isAuthorized,
+      set.isAuthorized || {}
+    );
+
+    // What about the initialState!? How do we deal with that?
+
+    this.publishEvent('upserted', { selector: where, payload: set });
+  }
+
   update ({ where, set }) {
     if (!where) {
       throw new Error('Where is missing.');
