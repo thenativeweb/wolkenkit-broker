@@ -197,6 +197,162 @@ const lists = function (options) {
         });
       });
 
+      suite('upserted', () => {
+        test('is a function.', async () => {
+          assert.that(listStore.upserted).is.ofType('function');
+        });
+
+        test('throws an error if model name is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.upserted({});
+          }).is.throwingAsync('Model name is missing.');
+        });
+
+        test('throws an error if selector is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.upserted({ modelName: 'foo' });
+          }).is.throwingAsync('Selector is missing.');
+        });
+
+        test('throws an error if payload is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.upserted({ modelName: 'foo', selector: 'bar' });
+          }).is.throwingAsync('Payload is missing.');
+        });
+
+        test('throws an error if add is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.upserted({ modelName: 'foo', selector: 'bar', payload: {}});
+          }).is.throwingAsync('Add is missing.');
+        });
+
+        test('throws an error if update is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.upserted({ modelName: 'foo', selector: 'bar', payload: { add: {}}});
+          }).is.throwingAsync('Update is missing.');
+        });
+
+        test('throws an error if an invalid key is given.', async () => {
+          const selector = { id: uuid() };
+          const payload = { add: {}, update: { $add: 'Jane Doe' }};
+
+          await assert.that(async () => {
+            await listStore.upserted({ modelName, selector, payload });
+          }).is.throwingAsync('Keys must not begin with a $ sign.');
+        });
+
+        test('updates a single selected item using the update payload.', async () => {
+          const payloadAdd = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []};
+
+          await listStore.added({ modelName, payload: payloadAdd });
+
+          const selector = { id: payloadAdd.id };
+          const payloadUpdate = {
+            add: {},
+            update: {
+              destination: 'Sultan Saray',
+              participants: { $add: 'Jane Doe' }
+            }
+          };
+
+          await listStore.upserted({ modelName, selector, payload: payloadUpdate });
+
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
+
+          assert.that(peerGroups.length).is.equalTo(1);
+          assert.that(peerGroups[0]).is.equalTo({
+            id: payloadAdd.id,
+            initiator: 'Jane Doe',
+            destination: 'Sultan Saray',
+            participants: [ 'Jane Doe' ]
+          });
+        });
+
+        test('updates multiple selected items using the update payload.', async () => {
+          const payloadAddFirst = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
+                payloadAddSecond = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: []};
+
+          await listStore.added({ modelName, payload: payloadAddFirst });
+          await listStore.added({ modelName, payload: payloadAddSecond });
+
+          const selector = { destination: 'Riva' };
+          const payloadUpdate = {
+            add: {},
+            update: { destination: 'Sultan Saray' }
+          };
+
+          await listStore.upserted({ modelName, selector, payload: payloadUpdate });
+
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
+
+          assert.that(peerGroups.length).is.equalTo(2);
+          assert.that(peerGroups[0]).is.equalTo({
+            id: payloadAddFirst.id,
+            initiator: 'Jane Doe',
+            destination: 'Sultan Saray',
+            participants: []
+          });
+          assert.that(peerGroups[1]).is.equalTo({
+            id: payloadAddSecond.id,
+            initiator: 'John Doe',
+            destination: 'Sultan Saray',
+            participants: []
+          });
+        });
+
+        test('updates items selected by query using the update payload.', async () => {
+          const payloadAddFirst = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
+                payloadAddSecond = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe', 'Jane Doe' ]};
+
+          await listStore.added({ modelName, payload: payloadAddFirst });
+          await listStore.added({ modelName, payload: payloadAddSecond });
+
+          const selector = { initiator: { $greaterThan: 'Jessy Doe' }};
+          const payloadUpdate = {
+            add: {},
+            update: { destination: 'Sultan Saray' }
+          };
+
+          await listStore.upserted({ modelName, selector, payload: payloadUpdate });
+
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
+
+          assert.that(peerGroups.length).is.equalTo(2);
+          assert.that(peerGroups[0]).is.equalTo({
+            id: payloadAddFirst.id,
+            initiator: 'Jane Doe',
+            destination: 'Riva',
+            participants: []
+          });
+          assert.that(peerGroups[1]).is.equalTo({
+            id: payloadAddSecond.id,
+            initiator: 'John Doe',
+            destination: 'Sultan Saray',
+            participants: [ 'John Doe', 'Jane Doe' ]
+          });
+        });
+
+        test('adds the given item.', async () => {
+          const payload = {
+            add: {
+              id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []
+            },
+            update: { destination: 'Sultan Saray' }
+          };
+          const selector = { id: payload.add.id };
+
+          await listStore.upserted({ modelName, selector, payload });
+
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
+
+          assert.that(peerGroups.length).is.equalTo(1);
+        });
+      });
+
       suite('updated', () => {
         test('is a function.', async () => {
           assert.that(listStore.updated).is.ofType('function');

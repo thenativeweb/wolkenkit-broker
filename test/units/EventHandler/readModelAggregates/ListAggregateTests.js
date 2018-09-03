@@ -367,6 +367,186 @@ suite('ListAggregate', () => {
         assert.that(listAggregate.uncommittedEvents[0].data.payload.isAuthorized.forAuthenticated).is.true();
         assert.that(listAggregate.uncommittedEvents[0].data.payload.isAuthorized.forPublic).is.true();
       });
+
+      suite('orUpdate', () => {
+        test('is a function.', async () => {
+          const id = uuid();
+          const listAggregate = new ListAggregate.Writable({
+            readModel,
+            modelStore: {},
+            modelName: 'peerGroups',
+            domainEvent,
+            uncommittedEvents: []
+          });
+
+          const result = listAggregate.add({ id, initiator: 'Jane Doe', destination: 'Riva', participants: []});
+
+          assert.that(result).is.ofType('object');
+          assert.that(result.orUpdate).is.ofType('function');
+        });
+
+        test('throws an error if where is missing and unpublish the added event.', async () => {
+          const id = uuid();
+          const listAggregate = new ListAggregate.Writable({
+            readModel,
+            modelStore: {},
+            modelName: 'peerGroups',
+            domainEvent,
+            uncommittedEvents: []
+          });
+
+          assert.that(() => {
+            listAggregate.
+              add({ id, initiator: 'Jane Doe', destination: 'Riva', participants: []}).
+              orUpdate({});
+          }).is.throwing('Where is missing.');
+
+          assert.that(listAggregate.uncommittedEvents.length).is.equalTo(0);
+        });
+
+        test('throws an error if set is missing and unpublish the added event.', async () => {
+          const id = uuid();
+          const listAggregate = new ListAggregate.Writable({
+            readModel,
+            modelStore: {},
+            modelName: 'peerGroups',
+            domainEvent,
+            uncommittedEvents: []
+          });
+
+          assert.that(() => {
+            listAggregate.
+              add({ id, initiator: 'Jane Doe', destination: 'Riva', participants: []}).
+              orUpdate({
+                where: { initiator: 'Jane Doe' }
+              });
+          }).is.throwing('Set is missing.');
+
+          assert.that(listAggregate.uncommittedEvents.length).is.equalTo(0);
+        });
+
+        test('throws an error if set is an empty object and unpublish the added event.', async () => {
+          const id = uuid();
+          const listAggregate = new ListAggregate.Writable({
+            readModel,
+            modelStore: {},
+            modelName: 'peerGroups',
+            domainEvent,
+            uncommittedEvents: []
+          });
+
+          assert.that(() => {
+            listAggregate.
+              add({ id, initiator: 'Jane Doe', destination: 'Riva', participants: []}).
+              orUpdate({
+                where: { initiator: 'Jane Doe' },
+                set: {}
+              });
+          }).is.throwing('Set must not be empty.');
+
+          assert.that(listAggregate.uncommittedEvents.length).is.equalTo(0);
+        });
+
+        test('adds a single upserted event to the list of uncommitted events.', async () => {
+          const id = uuid();
+          const listAggregate = new ListAggregate.Writable({
+            readModel,
+            modelStore: {},
+            modelName: 'peerGroups',
+            domainEvent,
+            uncommittedEvents: []
+          });
+
+          listAggregate.
+            add({ id, initiator: 'Jane Doe', destination: 'Riva', participants: []}).
+            orUpdate({
+              where: { initiator: 'Jane Doe' },
+              set: { destination: 'Riva' }
+            });
+
+          assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
+          assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
+          assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
+          assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('upserted');
+          assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
+          assert.that(listAggregate.uncommittedEvents[0].data.selector).is.equalTo({
+            initiator: 'Jane Doe'
+          });
+          assert.that(listAggregate.uncommittedEvents[0].data.payload.add).is.ofType('object');
+          assert.that(listAggregate.uncommittedEvents[0].data.payload.update).is.equalTo({
+            destination: 'Riva'
+          });
+        });
+
+        test('adds multiple upserted events to the list of uncommitted events.', async () => {
+          const id1 = uuid();
+          const id2 = uuid();
+          const listAggregate = new ListAggregate.Writable({
+            readModel,
+            modelStore: {},
+            modelName: 'peerGroups',
+            domainEvent,
+            uncommittedEvents: []
+          });
+
+          listAggregate.
+            add({ id: id1, initiator: 'Jane Doe', destination: 'Riva', participants: []}).
+            orUpdate({
+              where: { initiator: 'Jane Doe' },
+              set: { destination: 'Riva' }
+            });
+
+          listAggregate.
+            add({ id: id2, initiator: 'Jane Doe', destination: 'Sultan Saray', participants: []}).
+            orUpdate({
+              where: { initiator: 'Jane Doe' },
+              set: { destination: 'Sultan Saray' }
+            });
+
+          assert.that(listAggregate.uncommittedEvents.length).is.equalTo(2);
+          assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('upserted');
+          assert.that(listAggregate.uncommittedEvents[0].data.selector).is.equalTo({
+            initiator: 'Jane Doe'
+          });
+          assert.that(listAggregate.uncommittedEvents[0].data.payload.add).is.ofType('object');
+          assert.that(listAggregate.uncommittedEvents[0].data.payload.update).is.equalTo({
+            destination: 'Riva'
+          });
+          assert.that(listAggregate.uncommittedEvents[1].name).is.equalTo('upserted');
+          assert.that(listAggregate.uncommittedEvents[1].data.selector).is.equalTo({
+            initiator: 'Jane Doe'
+          });
+          assert.that(listAggregate.uncommittedEvents[1].data.payload.add).is.ofType('object');
+          assert.that(listAggregate.uncommittedEvents[1].data.payload.update).is.equalTo({
+            destination: 'Sultan Saray'
+          });
+        });
+
+        test('applies the domain event authorization information to the model event.', async () => {
+          const id = uuid();
+          const listAggregate = new ListAggregate.Writable({
+            readModel,
+            modelStore: {},
+            modelName: 'peerGroups',
+            domainEvent,
+            uncommittedEvents: []
+          });
+
+          listAggregate.
+            add({ id, initiator: 'Jane Doe', destination: 'Riva', participants: []}).
+            orUpdate({
+              where: { initiator: 'Jane Doe' },
+              set: { destination: 'Riva' }
+            });
+
+          assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
+          assert.that(listAggregate.uncommittedEvents[0].metadata.isAuthorized).is.equalTo({
+            owner: domainEvent.metadata.isAuthorized.owner,
+            forAuthenticated: false,
+            forPublic: true
+          });
+        });
+      });
     });
 
     suite('update', () => {

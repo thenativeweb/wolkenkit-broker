@@ -145,11 +145,28 @@ class ListStore extends EventEmitter {
     if (!payload) {
       throw new Error('Payload is missing.');
     }
+    if (!payload.add) {
+      throw new Error('Add is missing.');
+    }
+    if (!payload.update) {
+      throw new Error('Update is missing.');
+    }
 
-    const translatedPayload = translate.payload(payload),
-          translatedSelector = translate.selector(selector);
+    const { add, update } = payload;
 
-    await this.collections[modelName].updateMany(translatedSelector, translatedPayload, { upsert: true });
+    const result = await this.updated({ modelName, selector, payload: update });
+
+    if (result.modifiedCount > 0) {
+      return;
+    }
+
+    try {
+      await this.added({ modelName, payload: add });
+    } catch (ex) {
+      // If the entry has already been added in the meantime (race condition),
+      // then perform update again.
+      await this.updated({ modelName, selector, payload: update });
+    }
   }
 
   async updated ({ modelName, selector, payload }) {
@@ -166,7 +183,9 @@ class ListStore extends EventEmitter {
     const translatedPayload = translate.payload(payload),
           translatedSelector = translate.selector(selector);
 
-    await this.collections[modelName].updateMany(translatedSelector, translatedPayload);
+    const result = await this.collections[modelName].updateMany(translatedSelector, translatedPayload);
+
+    return result;
   }
 
   async removed ({ modelName, selector }) {

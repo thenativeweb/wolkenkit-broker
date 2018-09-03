@@ -89,6 +89,23 @@ class Writable extends Readable {
         isAuthorized: this.domainEvent.metadata.isAuthorized
       }
     }));
+
+    const indexOfEvent = this.uncommittedEvents.length - 1;
+
+    return indexOfEvent;
+  }
+
+  unpublishEvent (index) {
+    if (index === undefined) {
+      throw new Error('Index is missing.');
+    }
+    if (!this.uncommittedEvents[index]) {
+      throw new Error('Index not exists.');
+    }
+
+    const [ unpublishEvent ] = this.uncommittedEvents.splice(index, 1);
+
+    return unpublishEvent;
   }
 
   add (payload) {
@@ -109,34 +126,25 @@ class Writable extends Readable {
       payload.isAuthorized || {}
     );
 
-    this.publishEvent('added', { payload });
-  }
+    const index = this.publishEvent('added', { payload });
 
-  upsert ({ where, set }) {
-    if (!where) {
-      throw new Error('Where is missing.');
-    }
-    if (!set) {
-      throw new Error('Set is missing.');
-    }
-    if (Object.keys(set).length === 0) {
-      throw new Error('Set must not be empty.');
-    }
+    const orUpdate = ({ where, set }) => {
+      this.unpublishEvent(index);
 
-    // If there is no id provided in 'set' use the id from 'where'. Else use the
-    // id of the aggregate.
-    set.id = set.id || where.id || this.domainEvent.aggregate.id;
+      if (!where) {
+        throw new Error('Where is missing.');
+      }
+      if (!set) {
+        throw new Error('Set is missing.');
+      }
+      if (Object.keys(set).length === 0) {
+        throw new Error('Set must not be empty.');
+      }
 
-    // Copied from 'add' - is it needed?
-    set.isAuthorized = merge(
-      {},
-      this.domainEvent.metadata.isAuthorized,
-      set.isAuthorized || {}
-    );
+      this.publishEvent('upserted', { selector: where, payload: { add: payload, update: set }});
+    };
 
-    // What about the initialState!? How do we deal with that?
-
-    this.publishEvent('upserted', { selector: where, payload: set });
+    return { orUpdate };
   }
 
   update ({ where, set }) {
