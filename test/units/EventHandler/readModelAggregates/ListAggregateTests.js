@@ -385,7 +385,7 @@ suite('ListAggregate', () => {
           assert.that(result.orUpdate).is.ofType('function');
         });
 
-        test('throws an error if where is missing and unpublish the added event.', async () => {
+        test('throws an error if where is missing.', async () => {
           const id = uuid();
           const listAggregate = new ListAggregate.Writable({
             readModel,
@@ -400,11 +400,9 @@ suite('ListAggregate', () => {
               add({ id, initiator: 'Jane Doe', destination: 'Riva', participants: []}).
               orUpdate({});
           }).is.throwing('Where is missing.');
-
-          assert.that(listAggregate.uncommittedEvents.length).is.equalTo(0);
         });
 
-        test('throws an error if set is missing and unpublish the added event.', async () => {
+        test('throws an error if set is missing.', async () => {
           const id = uuid();
           const listAggregate = new ListAggregate.Writable({
             readModel,
@@ -421,11 +419,9 @@ suite('ListAggregate', () => {
                 where: { initiator: 'Jane Doe' }
               });
           }).is.throwing('Set is missing.');
-
-          assert.that(listAggregate.uncommittedEvents.length).is.equalTo(0);
         });
 
-        test('throws an error if set is an empty object and unpublish the added event.', async () => {
+        test('throws an error if set is an empty object.', async () => {
           const id = uuid();
           const listAggregate = new ListAggregate.Writable({
             readModel,
@@ -443,8 +439,6 @@ suite('ListAggregate', () => {
                 set: {}
               });
           }).is.throwing('Set must not be empty.');
-
-          assert.that(listAggregate.uncommittedEvents.length).is.equalTo(0);
         });
 
         test('adds a single upserted event to the list of uncommitted events.', async () => {

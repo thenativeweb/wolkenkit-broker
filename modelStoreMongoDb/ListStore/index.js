@@ -163,8 +163,13 @@ class ListStore extends EventEmitter {
     try {
       await this.added({ modelName, payload: add });
     } catch (ex) {
-      // If the entry has already been added in the meantime (race condition),
-      // then perform update again.
+      // Ignore duplicate key exceptions,
+      // because this means the entry was already added in the meantime (race condition).
+      if (ex.code !== 11000) {
+        throw ex;
+      }
+
+      // Perform the update again to workaround the race condition.
       await this.updated({ modelName, selector, payload: update });
     }
   }

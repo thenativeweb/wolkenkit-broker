@@ -69,12 +69,18 @@ class Writable extends Readable {
     this.uncommittedEvents = uncommittedEvents;
   }
 
-  publishEvent (name, data) {
+  publishEvent (name, data, replace = false) {
     if (!name) {
       throw new Error('Name is missing.');
     }
     if (!data) {
       throw new Error('Data is missing.');
+    }
+
+    if (replace) {
+      const lastIndex = this.uncommittedEvents.length - 1;
+
+      this.uncommittedEvents.splice(lastIndex, 1);
     }
 
     this.uncommittedEvents.push(new Event({
@@ -89,23 +95,6 @@ class Writable extends Readable {
         isAuthorized: this.domainEvent.metadata.isAuthorized
       }
     }));
-
-    const indexOfEvent = this.uncommittedEvents.length - 1;
-
-    return indexOfEvent;
-  }
-
-  unpublishEvent (index) {
-    if (index === undefined) {
-      throw new Error('Index is missing.');
-    }
-    if (!this.uncommittedEvents[index]) {
-      throw new Error('Index not exists.');
-    }
-
-    const [ unpublishEvent ] = this.uncommittedEvents.splice(index, 1);
-
-    return unpublishEvent;
   }
 
   add (payload) {
@@ -126,11 +115,9 @@ class Writable extends Readable {
       payload.isAuthorized || {}
     );
 
-    const index = this.publishEvent('added', { payload });
+    this.publishEvent('added', { payload });
 
     const orUpdate = ({ where, set }) => {
-      this.unpublishEvent(index);
-
       if (!where) {
         throw new Error('Where is missing.');
       }
@@ -141,7 +128,7 @@ class Writable extends Readable {
         throw new Error('Set must not be empty.');
       }
 
-      this.publishEvent('upserted', { selector: where, payload: { add: payload, update: set }});
+      this.publishEvent('upserted', { selector: where, payload: { add: payload, update: set }}, true);
     };
 
     return { orUpdate };
