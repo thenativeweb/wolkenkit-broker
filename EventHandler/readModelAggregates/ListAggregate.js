@@ -78,9 +78,7 @@ class Writable extends Readable {
     }
 
     if (replace) {
-      const lastIndex = this.uncommittedEvents.length - 1;
-
-      this.uncommittedEvents.splice(lastIndex, 1);
+      this.uncommittedEvents.pop();
     }
 
     this.uncommittedEvents.push(new Event({
