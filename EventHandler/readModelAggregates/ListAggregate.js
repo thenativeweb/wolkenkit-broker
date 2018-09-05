@@ -69,12 +69,16 @@ class Writable extends Readable {
     this.uncommittedEvents = uncommittedEvents;
   }
 
-  publishEvent (name, data) {
+  publishEvent (name, data, replace = false) {
     if (!name) {
       throw new Error('Name is missing.');
     }
     if (!data) {
       throw new Error('Data is missing.');
+    }
+
+    if (replace) {
+      this.uncommittedEvents.pop();
     }
 
     this.uncommittedEvents.push(new Event({
@@ -110,6 +114,22 @@ class Writable extends Readable {
     );
 
     this.publishEvent('added', { payload });
+
+    const orUpdate = ({ where, set }) => {
+      if (!where) {
+        throw new Error('Where is missing.');
+      }
+      if (!set) {
+        throw new Error('Set is missing.');
+      }
+      if (Object.keys(set).length === 0) {
+        throw new Error('Set must not be empty.');
+      }
+
+      this.publishEvent('upserted', { selector: where, payload: { add: payload, update: set }}, true);
+    };
+
+    return { orUpdate };
   }
 
   update ({ where, set }) {

@@ -135,6 +135,45 @@ class ListStore extends EventEmitter {
     Reflect.deleteProperty(payload, '_id');
   }
 
+  async upserted ({ modelName, selector, payload }) {
+    if (!modelName) {
+      throw new Error('Model name is missing.');
+    }
+    if (!selector) {
+      throw new Error('Selector is missing.');
+    }
+    if (!payload) {
+      throw new Error('Payload is missing.');
+    }
+    if (!payload.add) {
+      throw new Error('Add is missing.');
+    }
+    if (!payload.update) {
+      throw new Error('Update is missing.');
+    }
+
+    const { add, update } = payload;
+
+    const result = await this.updated({ modelName, selector, payload: update });
+
+    if (result.modifiedCount > 0) {
+      return;
+    }
+
+    try {
+      await this.added({ modelName, payload: add });
+    } catch (ex) {
+      // Ignore duplicate key exceptions,
+      // because this means the entry was already added in the meantime (race condition).
+      if (ex.code !== 11000) {
+        throw ex;
+      }
+
+      // Perform the update again to workaround the race condition.
+      await this.updated({ modelName, selector, payload: update });
+    }
+  }
+
   async updated ({ modelName, selector, payload }) {
     if (!modelName) {
       throw new Error('Model name is missing.');
@@ -149,7 +188,9 @@ class ListStore extends EventEmitter {
     const translatedPayload = translate.payload(payload),
           translatedSelector = translate.selector(selector);
 
-    await this.collections[modelName].updateMany(translatedSelector, translatedPayload);
+    const result = await this.collections[modelName].updateMany(translatedSelector, translatedPayload);
+
+    return result;
   }
 
   async removed ({ modelName, selector }) {
