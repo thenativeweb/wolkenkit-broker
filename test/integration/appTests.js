@@ -933,4 +933,15 @@ suite('integrationTests', function () {
       });
     });
   });
+
+  suite('api-shell', () => {
+    test('is displayed at root level.', async () => {
+      const res = await request.get('https://localhost:3000/');
+
+      assert.that(res.status).is.equalTo(200);
+      assert.that(res.text.startsWith('<!doctype html>\n<html>')).is.true();
+      assert.that(res.text).is.containing('<title>wolkenkit</title>');
+      assert.that(res.text.endsWith('</html>\n')).is.true();
+    });
+  });
 });

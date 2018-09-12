@@ -88,7 +88,8 @@ const loggerSystem = flaschenpost.getLogger();
       port: app.env('API_PORT'),
       corsOrigin: getCorsOrigin(app.env('API_CORS_ORIGIN')),
       writeModel: application.configuration.writeModel,
-      readModel: application.configuration.readModel
+      readModel: application.configuration.readModel,
+      serveStatic: path.join(__dirname, 'node_modules', 'wolkenkit-api-shell', 'build')
     }));
 
     await app.status.use(new app.wires.status.http.Server({
