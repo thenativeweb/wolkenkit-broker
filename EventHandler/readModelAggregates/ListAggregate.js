@@ -69,7 +69,7 @@ class Writable extends Readable {
     this.uncommittedEvents = uncommittedEvents;
   }
 
-  publishEvent (name, data, replace = false) {
+  publishEvent (name, data, { replace = false } = {}) {
     if (!name) {
       throw new Error('Name is missing.');
     }
@@ -126,10 +126,17 @@ class Writable extends Readable {
         throw new Error('Set must not be empty.');
       }
 
-      this.publishEvent('upserted', { selector: where, payload: { add: payload, update: set }}, true);
+      this.publishEvent('upserted', {
+        selector: where,
+        payload: { add: payload, update: set }
+      }, { replace: true });
     };
 
-    return { orUpdate };
+    const orDiscard = () => {
+      this.publishEvent('ensured', { payload }, { replace: true });
+    };
+
+    return { orUpdate, orDiscard };
   }
 
   update ({ where, set }) {
