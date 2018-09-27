@@ -195,6 +195,16 @@ const lists = function (options) {
 
           assert.that(peerGroups.length).is.equalTo(1);
         });
+
+        test('throws an error if adding fails.', async () => {
+          const payload = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []};
+
+          await listStore.added({ modelName, payload });
+
+          await assert.that(async () => {
+            await listStore.added({ modelName, payload });
+          }).is.throwingAsync(ex => ex.code === 11000);
+        });
       });
 
       suite('upserted', () => {
@@ -350,6 +360,45 @@ const lists = function (options) {
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(1);
+        });
+      });
+
+      suite('ensured', () => {
+        test('is a function.', async () => {
+          assert.that(listStore.ensured).is.ofType('function');
+        });
+
+        test('throws an error if model name is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.ensured({});
+          }).is.throwingAsync('Model name is missing.');
+        });
+
+        test('throws an error if payload is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.ensured({ modelName: 'foo' });
+          }).is.throwingAsync('Payload is missing.');
+        });
+
+        test('adds the given item.', async () => {
+          const payload = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []};
+
+          await listStore.ensured({ modelName, payload });
+
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
+
+          assert.that(peerGroups.length).is.equalTo(1);
+        });
+
+        test('is not throwing an error if adding fails.', async () => {
+          const payload = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []};
+
+          await listStore.ensured({ modelName, payload });
+
+          await assert.that(async () => {
+            await listStore.ensured({ modelName, payload });
+          }).is.not.throwingAsync();
         });
       });
 

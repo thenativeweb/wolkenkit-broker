@@ -163,14 +163,36 @@ class ListStore extends EventEmitter {
     try {
       await this.added({ modelName, payload: add });
     } catch (ex) {
-      // Ignore duplicate key exceptions,
-      // because this means the entry was already added in the meantime (race condition).
+      // Ignore duplicate key exceptions, because this means the entry was
+      // already added in the meantime (which could be a race condition). In
+      // case of any other exception, we need to throw.
       if (ex.code !== 11000) {
         throw ex;
       }
 
       // Perform the update again to workaround the race condition.
       await this.updated({ modelName, selector, payload: update });
+    }
+  }
+
+  async ensured ({ modelName, payload }) {
+    if (!modelName) {
+      throw new Error('Model name is missing.');
+    }
+    if (!payload) {
+      throw new Error('Payload is missing.');
+    }
+
+    try {
+      await this.added({ modelName, payload });
+    } catch (ex) {
+      // Ignore duplicate key exceptions, because this means that the entry
+      // already exists and everything is fine in this case.
+      if (ex.code === 11000) {
+        return;
+      }
+
+      throw ex;
     }
   }
 
