@@ -24,6 +24,7 @@
     "async-retry": "1.2.3",
     "commands-events": "1.0.3",
     "flaschenpost": "1.1.1",
+    "get-cors-origin": "1.0.0",
     "lodash": "4.17.11",
     "mongodb": "3.1.6",
     "mongodb-uri": "0.9.7",

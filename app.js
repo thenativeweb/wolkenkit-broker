@@ -4,13 +4,13 @@ const path = require('path');
 
 const applicationManager = require('wolkenkit-application'),
       flaschenpost = require('flaschenpost'),
+      getCorsOrigin = require('get-cors-origin'),
       processEnv = require('processenv'),
       tailwind = require('tailwind');
 
 const eventStore = require(`wolkenkit-eventstore/${processEnv('EVENTSTORE_TYPE')}`);
 
 const eventSequencer = require('./eventSequencer'),
-      getCorsOrigin = require('./getCorsOrigin'),
       getEventHandlingStrategies = require('./appLogic/getEventHandlingStrategies'),
       { ListStore } = require('./modelStoreMongoDb'),
       logic = require('./appLogic'),
