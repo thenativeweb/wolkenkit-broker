@@ -151,7 +151,7 @@ suite('integrationTests', function () {
     eventStore = new EventStore();
     await eventStore.initialize({ url: env.POSTGRES_URL_INTEGRATION, namespace });
 
-    mq = await hase.connect(env.RABBITMQ_URL_INTEGRATION);
+    mq = await hase.connect({ url: env.RABBITMQ_URL_INTEGRATION });
     commandbus = await mq.worker('plcr::commands').createReadStream();
     eventbus = await mq.publisher('plcr::events').createWriteStream();
 
@@ -225,7 +225,9 @@ suite('integrationTests', function () {
   });
 
   suite('infrastructure recovery', () => {
-    test('exits when the connection to the command bus / event bus is lost.', async () => {
+    test('exits when the connection to the command bus / event bus is lost.', async function () {
+      this.timeout(25 * 1000);
+
       shell.exec('docker kill rabbitmq-integration');
 
       await sleep(1 * 1000);
