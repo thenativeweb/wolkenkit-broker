@@ -90,7 +90,11 @@ class Writable extends Readable {
       metadata: {
         correlationId: this.domainEvent.metadata.correlationId,
         causationId: this.domainEvent.id,
-        isAuthorized: this.domainEvent.metadata.isAuthorized
+        isAuthorized: merge(
+          {},
+          this.domainEvent.metadata.isAuthorized,
+          (data.payload && data.payload.isAuthorized) || {}
+        )
       }
     }));
   }
@@ -161,13 +165,15 @@ class Writable extends Readable {
       throw new Error('Invalid authorization options.');
     }
 
-    const payload = {};
+    const payload = {
+      isAuthorized: {}
+    };
 
     if (isBoolean(forAuthenticated)) {
-      payload['isAuthorized.forAuthenticated'] = forAuthenticated;
+      payload.isAuthorized.forAuthenticated = forAuthenticated;
     }
     if (isBoolean(forPublic)) {
-      payload['isAuthorized.forPublic'] = forPublic;
+      payload.isAuthorized.forPublic = forPublic;
     }
 
     this.publishEvent('updated', { selector: where, payload });
@@ -183,7 +189,9 @@ class Writable extends Readable {
 
     this.publishEvent('updated', {
       selector: where,
-      payload: { 'isAuthorized.owner': to }
+      payload: {
+        isAuthorized: { owner: to }
+      }
     });
   }
 

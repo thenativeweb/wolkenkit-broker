@@ -4,6 +4,7 @@ const { EventEmitter } = require('events');
 
 const cloneDeep = require('lodash/cloneDeep'),
       find = require('lodash/find'),
+      flatten = require('flat'),
       mongodbUri = require('mongodb-uri'),
       { MongoClient } = require('mongodb'),
       omit = require('lodash/omit'),
@@ -207,7 +208,19 @@ class ListStore extends EventEmitter {
       throw new Error('Payload is missing.');
     }
 
-    const translatedPayload = translate.payload(payload),
+    let clonedPayload = cloneDeep(payload);
+
+    // For isAuthorized we don't want to replace the existing one with the
+    // updates in the database, but merge it. For this, we need to provide the
+    // flattened path to MongoDB instead of the isAuthorized object.
+    if (clonedPayload.isAuthorized) {
+      const flattenedIsAuthorized = flatten({ isAuthorized: clonedPayload.isAuthorized });
+
+      clonedPayload = omit(clonedPayload, 'isAuthorized');
+      clonedPayload = { ...clonedPayload, ...flattenedIsAuthorized };
+    }
+
+    const translatedPayload = translate.payload(clonedPayload),
           translatedSelector = translate.selector(selector);
 
     const result = await this.collections[modelName].updateMany(translatedSelector, translatedPayload);

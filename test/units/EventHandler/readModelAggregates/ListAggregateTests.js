@@ -303,6 +303,34 @@ suite('ListAggregate', () => {
         assert.that(listAggregate.uncommittedEvents[0].metadata.isAuthorized).is.equalTo(domainEvent.metadata.isAuthorized);
       });
 
+      test('merges the domain event authorization with the custom authorization information.', async () => {
+        const otherUserId = uuid();
+
+        const listAggregate = new ListAggregate.Writable({
+          readModel,
+          modelStore: {},
+          modelName: 'peerGroups',
+          domainEvent,
+          uncommittedEvents: []
+        });
+
+        listAggregate.add({
+          id: uuid(),
+          initiator: 'Jane Doe',
+          destination: 'Riva',
+          participants: [],
+          isAuthorized: {
+            owner: otherUserId
+          }
+        });
+
+        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
+        assert.that(listAggregate.uncommittedEvents[0].metadata.isAuthorized).is.equalTo({
+          ...domainEvent.metadata.isAuthorized,
+          owner: otherUserId
+        });
+      });
+
       test('extends the payload using the domain event authorization information.', async () => {
         const id = uuid();
         const listAggregate = new ListAggregate.Writable({
@@ -836,7 +864,9 @@ suite('ListAggregate', () => {
         assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
         assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
           selector: { id: aggregateIdToUpdate },
-          payload: { 'isAuthorized.forAuthenticated': false }
+          payload: {
+            isAuthorized: { forAuthenticated: false }
+          }
         });
       });
 
@@ -863,7 +893,9 @@ suite('ListAggregate', () => {
         assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
         assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
           selector: { id: aggregateIdToUpdate },
-          payload: { 'isAuthorized.forAuthenticated': true }
+          payload: {
+            isAuthorized: { forAuthenticated: true }
+          }
         });
       });
 
@@ -907,7 +939,9 @@ suite('ListAggregate', () => {
         assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
         assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
           selector: { id: aggregateIdToUpdate },
-          payload: { 'isAuthorized.forPublic': false }
+          payload: {
+            isAuthorized: { forPublic: false }
+          }
         });
       });
 
@@ -934,7 +968,9 @@ suite('ListAggregate', () => {
         assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
         assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
           selector: { id: aggregateIdToUpdate },
-          payload: { 'isAuthorized.forPublic': true }
+          payload: {
+            isAuthorized: { forPublic: true }
+          }
         });
       });
 
@@ -964,8 +1000,10 @@ suite('ListAggregate', () => {
         assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
           selector: { id: aggregateIdToUpdate },
           payload: {
-            'isAuthorized.forAuthenticated': false,
-            'isAuthorized.forPublic': true
+            isAuthorized: {
+              forAuthenticated: false,
+              forPublic: true
+            }
           }
         });
       });
@@ -1026,7 +1064,9 @@ suite('ListAggregate', () => {
         assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
         assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
           selector: { id: aggregateIdToUpdate },
-          payload: { 'isAuthorized.owner': newOwnerId }
+          payload: {
+            isAuthorized: { owner: newOwnerId }
+          }
         });
       });
 
@@ -1055,7 +1095,9 @@ suite('ListAggregate', () => {
         assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
         assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
           selector: { id: aggregateIdToUpdate },
-          payload: { 'isAuthorized.owner': newOwnerId }
+          payload: {
+            isAuthorized: { owner: newOwnerId }
+          }
         });
       });
     });

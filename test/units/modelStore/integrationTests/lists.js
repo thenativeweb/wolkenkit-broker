@@ -279,6 +279,52 @@ const lists = function (options) {
           });
         });
 
+        test('merges the given authorization options with the existing ones.', async () => {
+          const payloadAdd = {
+            id: uuid(),
+            initiator: 'Jane Doe',
+            destination: 'Riva',
+            participants: [],
+            isAuthorized: {
+              owner: 'jane.doe',
+              forAuthenticated: true,
+              forPublic: true
+            }
+          };
+
+          await listStore.added({ modelName, payload: payloadAdd });
+
+          const selector = { id: payloadAdd.id };
+          const payloadUpdate = {
+            add: {},
+            update: {
+              destination: 'Sultan Saray',
+              participants: { $add: 'Jane Doe' },
+              isAuthorized: {
+                forPublic: false
+              }
+            }
+          };
+
+          await listStore.upserted({ modelName, selector, payload: payloadUpdate });
+
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
+
+          assert.that(peerGroups.length).is.equalTo(1);
+          assert.that(peerGroups[0]).is.equalTo({
+            id: payloadAdd.id,
+            initiator: 'Jane Doe',
+            destination: 'Sultan Saray',
+            participants: [ 'Jane Doe' ],
+            isAuthorized: {
+              owner: 'jane.doe',
+              forAuthenticated: true,
+              forPublic: false
+            }
+          });
+        });
+
         test('updates multiple selected items using the update payload.', async () => {
           const payloadAddFirst = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
                 payloadAddSecond = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: []};
@@ -453,6 +499,47 @@ const lists = function (options) {
             initiator: 'Jane Doe',
             destination: 'Sultan Saray',
             participants: [ 'Jane Doe' ]
+          });
+        });
+
+        test('merges the given authorization options with the existing ones.', async () => {
+          const payloadAdd = {
+            id: uuid(),
+            initiator: 'Jane Doe',
+            destination: 'Riva',
+            participants: [],
+            isAuthorized: {
+              owner: 'jane.doe',
+              forAuthenticated: true,
+              forPublic: true
+            }
+          };
+
+          await listStore.added({ modelName, payload: payloadAdd });
+
+          const selector = { id: payloadAdd.id };
+          const payloadUpdate = {
+            destination: 'Sultan Saray',
+            participants: { $add: 'Jane Doe' },
+            isAuthorized: { forPublic: false }
+          };
+
+          await listStore.updated({ modelName, selector, payload: payloadUpdate });
+
+          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const peerGroups = await toArray(stream);
+
+          assert.that(peerGroups.length).is.equalTo(1);
+          assert.that(peerGroups[0]).is.equalTo({
+            id: payloadAdd.id,
+            initiator: 'Jane Doe',
+            destination: 'Sultan Saray',
+            participants: [ 'Jane Doe' ],
+            isAuthorized: {
+              owner: 'jane.doe',
+              forAuthenticated: true,
+              forPublic: false
+            }
           });
         });
 
