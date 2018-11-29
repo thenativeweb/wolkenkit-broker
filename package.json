@@ -34,7 +34,7 @@
     "streamtoarray": "1.0.0",
     "tailwind": "2.4.1",
     "uuidv4": "2.0.0",
-    "wolkenkit-api-shell": "1.1.0",
+    "wolkenkit-api-shell": "1.1.1",
     "wolkenkit-application": "3.0.0",
     "wolkenkit-eventstore": "2.5.0"
   },
