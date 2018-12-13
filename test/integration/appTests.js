@@ -26,7 +26,7 @@ const api = {};
 
 api.sendCommand = async function (command) {
   const res = await request.
-    post('https://localhost:3000/v1/command').
+    post('http://localhost:3000/v1/command').
     send(command);
 
   return res;
@@ -34,7 +34,7 @@ api.sendCommand = async function (command) {
 
 api.subscribeToEvents = async function (options) {
   const server = await jsonLinesClient({
-    protocol: 'https',
+    protocol: 'http',
     host: 'localhost',
     port: 3000,
     path: '/v1/events',
@@ -87,7 +87,7 @@ api.readModel = async function (options) {
   }
 
   const server = await jsonLinesClient({
-    protocol: 'https',
+    protocol: 'http',
     host: 'localhost',
     port: 3000,
     path: `/v1/read/${options.modelType}/${options.modelName}`,
@@ -189,7 +189,6 @@ suite('integrationTests', function () {
     stopApp = runfork({
       path: app,
       env: {
-        API_KEYS: path.join(__dirname, '..', 'shared', 'keys'),
         API_HOST: 'localhost',
         API_PORT: 3000,
         API_CORS_ORIGIN: '*',
@@ -233,7 +232,7 @@ suite('integrationTests', function () {
       await sleep(1 * 1000);
 
       await assert.that(async () => {
-        await request.get('https://localhost:3000/v1/ping');
+        await request.get('http://localhost:3000/v1/ping');
       }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
 
       shell.exec('docker start rabbitmq-integration');
@@ -246,7 +245,7 @@ suite('integrationTests', function () {
       await sleep(1 * 1000);
 
       await assert.that(async () => {
-        await request.get('https://localhost:3000/v1/ping');
+        await request.get('http://localhost:3000/v1/ping');
       }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
 
       shell.exec('docker start postgres-integration');
@@ -265,7 +264,7 @@ suite('integrationTests', function () {
       await sleep(1 * 1000);
 
       await assert.that(async () => {
-        await request.get('https://localhost:3000/v1/ping');
+        await request.get('http://localhost:3000/v1/ping');
       }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
 
       shell.exec('docker start mongodb-integration');
@@ -816,7 +815,7 @@ suite('integrationTests', function () {
 
       test('closes the stream once all data have been sent.', async () => {
         const server = await jsonLinesClient({
-          protocol: 'https',
+          protocol: 'http',
           host: 'localhost',
           port: 3000,
           path: `/v1/read/lists/peerGroups`
@@ -833,7 +832,7 @@ suite('integrationTests', function () {
 
       test('handles external stream closing gracefully.', async () => {
         const server = await jsonLinesClient({
-          protocol: 'https',
+          protocol: 'http',
           host: 'localhost',
           port: 3000,
           path: `/v1/read/lists/peerGroups`
@@ -845,7 +844,7 @@ suite('integrationTests', function () {
         // to make sure that the app is still running.
         await sleep(1 * 1000);
 
-        const res = await request.get('https://localhost:3000/v1/ping');
+        const res = await request.get('http://localhost:3000/v1/ping');
 
         assert.that(res.statusCode).is.equalTo(200);
       });
@@ -938,7 +937,7 @@ suite('integrationTests', function () {
 
   suite('api-shell', () => {
     test('is displayed at root level.', async () => {
-      const res = await request.get('https://localhost:3000/');
+      const res = await request.get('http://localhost:3000/');
 
       assert.that(res.status).is.equalTo(200);
       assert.that(res.text.startsWith('<!doctype html>\n<html>')).is.true();
