@@ -83,7 +83,6 @@ const loggerSystem = flaschenpost.getLogger();
 
     await app.api.use(new app.wires.api.http.Server({
       clientRegistry: 'wolkenkit',
-      host: app.env('API_HOST'),
       port: app.env('API_PORT'),
       corsOrigin: getCorsOrigin(app.env('API_CORS_ORIGIN')),
       writeModel: application.configuration.writeModel,

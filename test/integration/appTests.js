@@ -189,7 +189,6 @@ suite('integrationTests', function () {
     stopApp = runfork({
       path: app,
       env: {
-        API_HOST: 'localhost',
         API_PORT: 3000,
         API_CORS_ORIGIN: '*',
         APPLICATION: application,
