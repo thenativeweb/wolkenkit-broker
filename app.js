@@ -58,23 +58,45 @@ const loggerSystem = flaschenpost.getLogger();
       application: app.env('APPLICATION')
     }));
 
-    const eventHandlingStrategies = getEventHandlingStrategies({ app, eventStore, modelStore, readModel: application.readModel });
+    let lowestProcessedPosition;
 
-    const fromPosition = eventSequencer.getLowestProcessedPosition() + 1,
-          toPosition = undefined;
-
-    logger.info('Initially replaying events...', { fromPosition });
-
-    await performReplay({
-      eventStore,
-      fromPosition,
-      toPosition,
-      async handleReplayedDomainEvent (replayedDomainEvent) {
-        await eventHandlingStrategies.proceed(replayedDomainEvent, { type: 'proceed', forward: false });
+    try {
+      lowestProcessedPosition = eventSequencer.getLowestProcessedPosition();
+    } catch (ex) {
+      if (ex.message !== 'Failed to get lowest processed position.') {
+        throw ex;
       }
-    });
 
-    logger.info('Successfully replayed events.');
+      // Ignore if no lowest processed position could be gotten. This typically
+      // happens when no read model was defined.
+    }
+
+    if (lowestProcessedPosition === undefined) {
+      logger.info('Skipped replaying events.');
+    } else {
+      const fromPosition = lowestProcessedPosition + 1,
+            toPosition = undefined;
+
+      logger.info('Initially replaying events...', { fromPosition });
+
+      const eventHandlingStrategies = getEventHandlingStrategies({
+        app,
+        eventStore,
+        modelStore,
+        readModel: application.readModel
+      });
+
+      await performReplay({
+        eventStore,
+        fromPosition,
+        toPosition,
+        async handleReplayedDomainEvent (replayedDomainEvent) {
+          await eventHandlingStrategies.proceed(replayedDomainEvent, { type: 'proceed', forward: false });
+        }
+      });
+
+      logger.info('Successfully replayed events.');
+    }
 
     await app.eventbus.use(new app.wires.eventbus.amqp.Receiver({
       url: app.env('EVENTBUS_URL'),
