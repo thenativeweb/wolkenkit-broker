@@ -39,9 +39,29 @@ const appLogic = function ({ app, eventSequencer, eventStore, modelStore, readMo
     });
   });
 
-  app.api.read = async function (modelType, modelName, { where, orderBy, skip, take }) {
+  app.api.read = async function (modelType, modelName, { where, orderBy, skip, take, user }) {
+    if (!where) {
+      throw new Error('Where is missing.');
+    }
+    if (!orderBy) {
+      throw new Error('Order by is missing.');
+    }
+    if (skip === undefined) {
+      throw new Error('Skip is missing.');
+    }
+    if (take === undefined) {
+      throw new Error('Take is missing.');
+    }
+    if (!user) {
+      throw new Error('User is missing.');
+    }
+
     const incomingStream = await modelStore.read({
-      modelType, modelName, query: { where, orderBy, skip, take }
+      modelType,
+      modelName,
+      applyTransformations: true,
+      user,
+      query: { where, orderBy, skip, take }
     });
 
     // The outgoingStream is the stream that is used to send data to the

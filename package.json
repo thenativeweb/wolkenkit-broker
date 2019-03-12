@@ -22,7 +22,7 @@
   ],
   "dependencies": {
     "async-retry": "1.2.3",
-    "commands-events": "1.0.3",
+    "commands-events": "1.0.4",
     "flaschenpost": "1.1.3",
     "flat": "4.1.0",
     "get-cors-origin": "1.0.0",
@@ -32,15 +32,15 @@
     "processenv": "1.1.0",
     "sha1": "1.1.1",
     "streamtoarray": "1.0.0",
-    "tailwind": "3.0.0",
-    "uuidv4": "2.0.0",
+    "tailwind": "3.1.0",
+    "uuidv4": "3.0.1",
     "wolkenkit-api-shell": "1.1.1",
-    "wolkenkit-application": "3.0.0",
+    "wolkenkit-application": "4.3.0",
     "wolkenkit-eventstore": "2.5.0"
   },
   "devDependencies": {
     "amqplib": "0.5.3",
-    "assertthat": "2.0.1",
+    "assertthat": "2.0.3",
     "common-tags": "1.8.0",
     "hase": "2.0.0",
     "json-lines-client": "1.0.1",
@@ -48,10 +48,10 @@
     "pg": "7.4.3",
     "pg-connection-string": "2.0.0",
     "record-stdstreams": "1.0.0",
-    "roboter": "3.0.3",
-    "runfork": "1.0.3",
+    "roboter": "4.0.2",
+    "runfork": "1.1.0",
     "shelljs": "0.8.3",
-    "superagent": "3.8.3"
+    "superagent": "4.1.0"
   },
   "scripts": {
     "build": "docker build -t thenativeweb/wolkenkit-broker ."

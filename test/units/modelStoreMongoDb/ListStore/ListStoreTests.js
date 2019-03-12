@@ -112,6 +112,7 @@ suite('ListStore', () => {
       await assert.that(async () => {
         await listStore.read({
           modelName: storeOptions.modelName,
+          applyTransformations: false,
           query: {
             where: {
               $invalid: 'foo'
@@ -130,6 +131,7 @@ suite('ListStore', () => {
       await assert.that(async () => {
         await listStore.read({
           modelName: storeOptions.modelName,
+          applyTransformations: false,
           query: {
             orderBy: {
               timestamp: 'invalidOrderCriteria'

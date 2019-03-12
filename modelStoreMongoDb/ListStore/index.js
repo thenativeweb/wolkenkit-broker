@@ -1,6 +1,7 @@
 'use strict';
 
-const { EventEmitter } = require('events');
+const { EventEmitter } = require('events'),
+      { PassThrough, pipeline, Transform } = require('stream');
 
 const cloneDeep = require('lodash/cloneDeep'),
       find = require('lodash/find'),
@@ -40,6 +41,7 @@ class ListStore extends EventEmitter {
     }
 
     this.application = application;
+    this.readModel = readModel;
     this.modelNames = Object.keys(readModel);
 
     /* eslint-disable id-length */
@@ -240,9 +242,15 @@ class ListStore extends EventEmitter {
     await this.collections[modelName].deleteMany(translatedSelector);
   }
 
-  async read ({ modelName, query }) {
+  async read ({ modelName, applyTransformations, user, query }) {
     if (!modelName) {
       throw new Error('Model name is missing.');
+    }
+    if (applyTransformations === undefined) {
+      throw new Error('Apply transformations is missing.');
+    }
+    if (applyTransformations && !user) {
+      throw new Error('User is missing.');
     }
     if (!query) {
       throw new Error('Query is missing.');
@@ -274,8 +282,48 @@ class ListStore extends EventEmitter {
     }
     cursor = cursor.limit(query.take || 100);
 
-    const result = cursor.stream({
+    const databaseResult = cursor.stream({
       transform: item => omit(item, '_id')
+    });
+
+    if (!applyTransformations) {
+      return databaseResult;
+    }
+
+    const { readModel } = this;
+
+    const transformedResult = new Transform({
+      objectMode: true,
+      transform (chunk, encoding, callback) {
+        const { transformations } = readModel[modelName];
+
+        if (!transformations) {
+          this.push(chunk);
+
+          return callback(null);
+        }
+
+        const { filter, map } = transformations;
+
+        if (filter && !filter(chunk, user)) {
+          return callback(null);
+        }
+
+        let transformedChunk = chunk;
+
+        if (map) {
+          transformedChunk = map(chunk, user);
+        }
+
+        this.push(transformedChunk);
+        callback(null);
+      }
+    });
+
+    const result = new PassThrough({ objectMode: true });
+
+    pipeline(databaseResult, transformedResult, result, () => {
+      // Intentionally left blank.
     });
 
     return result;

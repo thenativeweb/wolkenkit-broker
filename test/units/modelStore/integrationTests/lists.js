@@ -190,7 +190,12 @@ const lists = function (options) {
 
           await listStore.added({ modelName, payload });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(1);
@@ -267,7 +272,12 @@ const lists = function (options) {
 
           await listStore.upserted({ modelName, selector, payload: payloadUpdate });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(1);
@@ -308,7 +318,12 @@ const lists = function (options) {
 
           await listStore.upserted({ modelName, selector, payload: payloadUpdate });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(1);
@@ -340,7 +355,12 @@ const lists = function (options) {
 
           await listStore.upserted({ modelName, selector, payload: payloadUpdate });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(2);
@@ -373,7 +393,12 @@ const lists = function (options) {
 
           await listStore.upserted({ modelName, selector, payload: payloadUpdate });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(2);
@@ -402,7 +427,12 @@ const lists = function (options) {
 
           await listStore.upserted({ modelName, selector, payload });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(1);
@@ -431,7 +461,12 @@ const lists = function (options) {
 
           await listStore.ensured({ modelName, payload });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(1);
@@ -490,7 +525,12 @@ const lists = function (options) {
 
           await listStore.updated({ modelName, selector, payload: payloadUpdate });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(1);
@@ -526,7 +566,12 @@ const lists = function (options) {
 
           await listStore.updated({ modelName, selector, payload: payloadUpdate });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(1);
@@ -555,7 +600,12 @@ const lists = function (options) {
 
           await listStore.updated({ modelName, selector, payload: payloadUpdate });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(2);
@@ -585,7 +635,12 @@ const lists = function (options) {
 
           await listStore.updated({ modelName, selector, payload: payloadUpdate });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(2);
@@ -630,7 +685,12 @@ const lists = function (options) {
 
           await listStore.removed({ modelName, selector });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(0);
@@ -647,7 +707,12 @@ const lists = function (options) {
 
           await listStore.removed({ modelName, selector });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(0);
@@ -664,7 +729,12 @@ const lists = function (options) {
 
           await listStore.removed({ modelName, selector });
 
-          const stream = await listStore.read({ modelType: 'lists', modelName, query: {}});
+          const stream = await listStore.read({
+            modelType: 'lists',
+            modelName,
+            applyTransformations: false,
+            query: {}
+          });
           const peerGroups = await toArray(stream);
 
           assert.that(peerGroups.length).is.equalTo(1);
@@ -688,9 +758,15 @@ const lists = function (options) {
           }).is.throwingAsync('Model name is missing.');
         });
 
-        test('throws an error if query is missing.', async () => {
+        test('throws an error if apply transformations is missing.', async () => {
           await assert.that(async () => {
             await listStore.read({ modelName: 'foo' });
+          }).is.throwingAsync('Apply transformations is missing.');
+        });
+
+        test('throws an error if query is missing.', async () => {
+          await assert.that(async () => {
+            await listStore.read({ modelName: 'foo', applyTransformations: false });
           }).is.throwingAsync('Query is missing.');
         });
 
@@ -703,7 +779,11 @@ const lists = function (options) {
 
           const query = {};
 
-          const stream = await listStore.read({ modelName, query });
+          const stream = await listStore.read({
+            modelName,
+            applyTransformations: false,
+            query
+          });
           const items = await toArray(stream);
 
           assert.that(items.length).is.equalTo(2);
@@ -722,7 +802,11 @@ const lists = function (options) {
             where: { initiator: 'Jane Doe' }
           };
 
-          const stream = await listStore.read({ modelName, query });
+          const stream = await listStore.read({
+            modelName,
+            applyTransformations: false,
+            query
+          });
           const items = await toArray(stream);
 
           assert.that(items.length).is.equalTo(1);
@@ -740,7 +824,11 @@ const lists = function (options) {
             where: { initiator: 'Jessy Doe' }
           };
 
-          const stream = await listStore.read({ modelName, query });
+          const stream = await listStore.read({
+            modelName,
+            applyTransformations: false,
+            query
+          });
           const items = await toArray(stream);
 
           assert.that(items.length).is.equalTo(0);
