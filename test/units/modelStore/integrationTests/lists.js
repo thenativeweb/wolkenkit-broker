@@ -20,35 +20,37 @@ const lists = function (options) {
         modelName,
         modelStore;
 
-    const simulateRestart = async function () {
-      const otherEventSequencer = new EventSequencer();
-      const otherListStore = new ListStore({ url, eventSequencer: otherEventSequencer });
-      const otherModelStore = new ModelStore();
-
-      await otherModelStore.initialize({
-        application: 'integrationTests',
-        eventSequencer: otherEventSequencer,
-        readModel: {
-          lists: {
-            [modelName]: {
-              fields: {
-                initiator: { initialState: '', fastLookup: true, isUnique: false },
-                destination: { initialState: '', fastLookup: true },
-                participants: { initialState: []},
-                stars: { initialState: 0 }
-              }
+    const initializeReadModel = async function ({ readModel } = {}) {
+      readModel = readModel || {
+        lists: {
+          [modelName]: {
+            fields: {
+              initiator: { initialState: '', fastLookup: true, isUnique: false },
+              destination: { initialState: '', fastLookup: true },
+              participants: { initialState: []},
+              stars: { initialState: 0 }
             }
           }
-        },
+        }
+      };
+
+      const newEventSequencer = new EventSequencer();
+      const newListStore = new ListStore({ url, eventSequencer: newEventSequencer });
+      const newModelStore = new ModelStore();
+
+      await newModelStore.initialize({
+        application: 'integrationTests',
+        eventSequencer: newEventSequencer,
+        readModel,
         stores: {
-          lists: otherListStore
+          lists: newListStore
         }
       });
 
       return {
-        eventSequencer: otherEventSequencer,
-        listStore: otherListStore,
-        modelStore: otherModelStore
+        eventSequencer: newEventSequencer,
+        listStore: newListStore,
+        modelStore: newModelStore
       };
     };
 
@@ -67,11 +69,11 @@ const lists = function (options) {
     setup(async () => {
       modelName = `peerGroups${uuid().substr(0, 8)}`;
 
-      const other = await simulateRestart();
+      const initializedReadModel = await initializeReadModel();
 
-      eventSequencer = other.eventSequencer;
-      listStore = other.listStore;
-      modelStore = other.modelStore;
+      eventSequencer = initializedReadModel.eventSequencer;
+      listStore = initializedReadModel.listStore;
+      modelStore = initializedReadModel.modelStore;
     });
 
     suite('constructor', () => {
@@ -146,7 +148,7 @@ const lists = function (options) {
 
       test('does not fail if model store has been initialized before.', async () => {
         await assert.that(async () => {
-          await simulateRestart();
+          await initializeReadModel();
         }).is.not.throwingAsync();
       });
 
@@ -157,9 +159,9 @@ const lists = function (options) {
 
         await modelStore.processEvents(domainEvent, []);
 
-        const other = await simulateRestart();
+        const initializedReadModel = await initializeReadModel();
 
-        assert.that(other.eventSequencer.models).is.equalTo({
+        assert.that(initializedReadModel.eventSequencer.models).is.equalTo({
           lists: {
             [modelName]: { lastProcessedPosition: 1 }
           }
@@ -764,6 +766,12 @@ const lists = function (options) {
           }).is.throwingAsync('Apply transformations is missing.');
         });
 
+        test('throws an error if user is missing if apply transformations is enabled.', async () => {
+          await assert.that(async () => {
+            await listStore.read({ modelName: 'foo', applyTransformations: true });
+          }).is.throwingAsync('User is missing.');
+        });
+
         test('throws an error if query is missing.', async () => {
           await assert.that(async () => {
             await listStore.read({ modelName: 'foo', applyTransformations: false });
@@ -832,6 +840,344 @@ const lists = function (options) {
           const items = await toArray(stream);
 
           assert.that(items.length).is.equalTo(0);
+        });
+
+        suite('transformations', () => {
+          const peerGroupByJane = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
+                peerGroupByJohn = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe', 'Jane Doe' ]};
+
+          const setupTransformations = async function ({ transformations }) {
+            const readModel = {
+              lists: {
+                [modelName]: {
+                  fields: {
+                    initiator: { initialState: '', fastLookup: true, isUnique: false },
+                    destination: { initialState: '', fastLookup: true },
+                    participants: { initialState: []},
+                    stars: { initialState: 0 }
+                  }
+                }
+              }
+            };
+
+            if (transformations) {
+              readModel.lists[modelName].transformations = transformations;
+            }
+
+            const initializedReadModel = await initializeReadModel({ readModel });
+
+            eventSequencer = initializedReadModel.eventSequencer;
+            listStore = initializedReadModel.listStore;
+            modelStore = initializedReadModel.modelStore;
+          };
+
+          const addItemsToList = async function () {
+            await listStore.added({ modelName, payload: peerGroupByJane });
+            await listStore.added({ modelName, payload: peerGroupByJohn });
+          };
+
+          suite('applyTransformations is false', () => {
+            test('do nothing if no transformations are given.', async () => {
+              await setupTransformations({ transformations: undefined });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if no map and no filter transformation are given.', async () => {
+              await setupTransformations({ transformations: {}});
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if a map transformation is given.', async () => {
+              const transformations = {
+                map () {
+                  return { overridden: true };
+                }
+              };
+
+              await setupTransformations({ transformations });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if a map transformation throws an error.', async () => {
+              const transformations = {
+                map () {
+                  throw new Error('Map failed.');
+                }
+              };
+
+              await setupTransformations({ transformations });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if a filter transformation is given.', async () => {
+              const transformations = {
+                filter () {
+                  return false;
+                }
+              };
+
+              await setupTransformations({ transformations });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if a filter transformation throws an error.', async () => {
+              const transformations = {
+                filter () {
+                  throw new Error('Filter failed.');
+                }
+              };
+
+              await setupTransformations({ transformations });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if a map and a filter transformation are given.', async () => {
+              const transformations = {
+                map () {
+                  return { overridden: true };
+                },
+
+                filter () {
+                  return false;
+                }
+              };
+
+              await setupTransformations({ transformations });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+          });
+
+          suite('applyTransformations is true', () => {
+            test('do nothing if no transformations are given.', async () => {
+              await setupTransformations({ transformations: undefined });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: true,
+                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if no map and no filter transformation are given.', async () => {
+              await setupTransformations({ transformations: {}});
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: true,
+                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('map if a map transformation is given.', async () => {
+              await setupTransformations({ transformations: {
+                map (peerGroup) {
+                  return { ...peerGroup, initiator: peerGroup.initiator.toUpperCase() };
+                }
+              }});
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: true,
+                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo({ ...peerGroupByJane, initiator: 'JANE DOE' });
+              assert.that(items[1]).is.equalTo({ ...peerGroupByJohn, initiator: 'JOHN DOE' });
+            });
+
+            test('skip if a map transformation throws an error.', async () => {
+              await setupTransformations({ transformations: {
+                map (peerGroup) {
+                  if (peerGroup.initiator === 'John Doe') {
+                    throw new Error('Map failed.');
+                  }
+
+                  return peerGroup;
+                }
+              }});
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: true,
+                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
+                query: {}
+              });
+
+              await assert.that(async () => {
+                await toArray(stream);
+              }).is.throwingAsync(ex =>
+                ex.message === 'Map failed.' &&
+                ex.array.length === 1 &&
+                ex.array[0].initiator === peerGroupByJane.initiator);
+            });
+
+            test('filter if a filter transformation is given.', async () => {
+              await setupTransformations({ transformations: {
+                filter (peerGroup) {
+                  return peerGroup.initiator === 'Jane Doe';
+                }
+              }});
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: true,
+                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(1);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+            });
+
+            test('skip if a filter transformation throws an error.', async () => {
+              await setupTransformations({ transformations: {
+                filter (peerGroup) {
+                  if (peerGroup.initiator === 'John Doe') {
+                    throw new Error('Filter failed.');
+                  }
+
+                  return true;
+                }
+              }});
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: true,
+                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
+                query: {}
+              });
+
+              await assert.that(async () => {
+                await toArray(stream);
+              }).is.throwingAsync(ex =>
+                ex.message === 'Filter failed.' &&
+                ex.array.length === 1 &&
+                ex.array[0].initiator === peerGroupByJane.initiator);
+            });
+
+            test('map and filter if a map and a filter transformation are given.', async () => {
+              await setupTransformations({ transformations: {
+                map (peerGroup) {
+                  return { ...peerGroup, initiator: peerGroup.initiator.toUpperCase() };
+                },
+
+                filter (peerGroup) {
+                  return peerGroup.initiator === 'Jane Doe';
+                }
+              }});
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: true,
+                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(1);
+              assert.that(items[0]).is.equalTo({ ...peerGroupByJane, initiator: 'JANE DOE' });
+            });
+          });
         });
       });
     });
@@ -1138,9 +1484,9 @@ const lists = function (options) {
         test('updates the event sequencer.', async () => {
           await listStore.updatePosition(23);
 
-          const other = await simulateRestart();
+          const restartedReadModel = await initializeReadModel();
 
-          assert.that(other.eventSequencer.models).is.equalTo({
+          assert.that(restartedReadModel.eventSequencer.models).is.equalTo({
             lists: {
               [modelName]: { lastProcessedPosition: 23 }
             }
@@ -1151,9 +1497,9 @@ const lists = function (options) {
           await listStore.updatePosition(23);
           await listStore.updatePosition(22);
 
-          const other = await simulateRestart();
+          const restartedReadModel = await initializeReadModel();
 
-          assert.that(other.eventSequencer.models).is.equalTo({
+          assert.that(restartedReadModel.eventSequencer.models).is.equalTo({
             lists: {
               [modelName]: { lastProcessedPosition: 23 }
             }

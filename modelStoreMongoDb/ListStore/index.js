@@ -294,36 +294,51 @@ class ListStore extends EventEmitter {
 
     const transformedResult = new Transform({
       objectMode: true,
-      transform (chunk, encoding, callback) {
+      transform (item, encoding, callback) {
         const { transformations } = readModel[modelName];
 
         if (!transformations) {
-          this.push(chunk);
+          this.push(item);
 
           return callback(null);
         }
 
         const { filter, map } = transformations;
 
-        if (filter && !filter(chunk, user)) {
-          return callback(null);
+        if (filter) {
+          let keepItem;
+
+          try {
+            keepItem = filter(item, { ...query, user });
+          } catch (ex) {
+            return callback(ex);
+          }
+
+          if (!keepItem) {
+            return callback(null);
+          }
         }
 
-        let transformedChunk = chunk;
+        let transformedItem = item;
 
         if (map) {
-          transformedChunk = map(chunk, user);
+          try {
+            transformedItem = map(item, { ...query, user });
+          } catch (ex) {
+            return callback(ex);
+          }
         }
 
-        this.push(transformedChunk);
-        callback(null);
+        callback(null, transformedItem);
       }
     });
 
     const result = new PassThrough({ objectMode: true });
 
-    pipeline(databaseResult, transformedResult, result, () => {
-      // Intentionally left blank.
+    pipeline(databaseResult, transformedResult, result, err => {
+      if (err) {
+        result.emit('error', err);
+      }
     });
 
     return result;
