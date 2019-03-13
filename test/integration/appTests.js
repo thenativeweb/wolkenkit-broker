@@ -22,6 +22,8 @@ const buildCommand = require('../shared/buildCommand'),
 
 const sleep = util.promisify(setTimeout);
 
+const isDebugMode = false;
+
 const api = {};
 
 api.sendCommand = async function (command) {
@@ -203,7 +205,8 @@ suite('integrationTests', function () {
         PROFILING_PORT: 8125,
         STATUS_PORT: 3001,
         STATUS_CORS_ORIGIN: '*'
-      }
+      },
+      silent: !isDebugMode
     });
 
     await sleep(2 * 1000);

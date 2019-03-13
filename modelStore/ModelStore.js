@@ -121,7 +121,7 @@ class ModelStore extends EventEmitter {
     })));
   }
 
-  async read ({ modelType, modelName, query = {}}) {
+  async read ({ modelType, modelName, applyTransformations = false, user, query = {}}) {
     if (!modelType) {
       throw new Error('Model type is missing.');
     }
@@ -129,12 +129,17 @@ class ModelStore extends EventEmitter {
       throw new Error('Model name is missing.');
     }
 
-    const stream = await this.stores[modelType].read({ modelName, query });
+    const stream = await this.stores[modelType].read({
+      modelName,
+      applyTransformations,
+      user,
+      query
+    });
 
     return stream;
   }
 
-  async readOne ({ modelType, modelName, query }) {
+  async readOne ({ modelType, modelName, applyTransformations = false, user, query }) {
     if (!modelType) {
       throw new Error('Model type is missing.');
     }
@@ -151,6 +156,8 @@ class ModelStore extends EventEmitter {
     const stream = await this.read({
       modelType,
       modelName,
+      applyTransformations,
+      user,
       query: {
         where: query.where,
         take: 1

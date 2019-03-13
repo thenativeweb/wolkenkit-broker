@@ -427,6 +427,8 @@ suite('ModelStore', () => {
       assert.that(peerGroups).is.equalTo('this should be a stream');
       assert.that(listStore.options).is.equalTo({
         modelName: 'peerGroups',
+        applyTransformations: false,
+        user: undefined,
         query: {
           where: { foo: 'bar' }
         }
@@ -560,6 +562,8 @@ suite('ModelStore', () => {
       assert.that(item).is.equalTo('this should be an item');
       assert.that(listStore.options).is.equalTo({
         modelName: 'peerGroups',
+        applyTransformations: false,
+        user: undefined,
         query: {
           where: { foo: 'bar' },
           take: 1
