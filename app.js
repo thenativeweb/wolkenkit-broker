@@ -5,10 +5,10 @@ const path = require('path');
 const applicationManager = require('wolkenkit-application'),
       flaschenpost = require('flaschenpost'),
       getCorsOrigin = require('get-cors-origin'),
-      processEnv = require('processenv'),
+      processenv = require('processenv'),
       tailwind = require('tailwind');
 
-const eventStore = require(`wolkenkit-eventstore/${processEnv('EVENTSTORE_TYPE')}`);
+const eventStore = require(`wolkenkit-eventstore/${processenv('EVENTSTORE_TYPE')}`);
 
 const eventSequencer = require('./eventSequencer'),
       getEventHandlingStrategies = require('./appLogic/getEventHandlingStrategies'),
@@ -21,16 +21,17 @@ const loggerSystem = flaschenpost.getLogger();
 
 (async () => {
   try {
+    const identityProviders = processenv('IDENTITYPROVIDERS', []).
+      map(identityProvider => ({
+        issuer: identityProvider.issuer,
+        certificate: path.join(identityProvider.certificate, 'certificate.pem')
+      }));
+
     const app = tailwind.createApp({
-      identityProvider: {
-        /* eslint-disable no-process-env */
-        name: process.env.IDENTITYPROVIDER_NAME,
-        certificate: path.join(process.env.IDENTITYPROVIDER_CERTIFICATE, 'certificate.pem')
-        /* eslint-enable no-process-env */
-      },
+      identityProviders,
       profiling: {
-        host: processEnv('PROFILING_HOST'),
-        port: processEnv('PROFILING_PORT')
+        host: processenv('PROFILING_HOST'),
+        port: processenv('PROFILING_PORT')
       }
     });
 

@@ -10,10 +10,12 @@ const getLogger = require('../../../../EventHandler/services/getLogger');
 
 const app = tailwind.createApp({
   keys: path.join(__dirname, '..', '..', '..', 'shared', 'keys'),
-  identityProvider: {
-    name: 'auth.wolkenkit.io',
-    certificate: path.join(__dirname, '..', '..', '..', 'shared', 'keys', 'certificate.pem')
-  }
+  identityProviders: [
+    {
+      issuer: 'https://auth.thenativeweb.io',
+      certificate: path.join(__dirname, '..', '..', '..', 'shared', 'keys', 'certificate.pem')
+    }
+  ]
 });
 
 const modelType = 'lists';
