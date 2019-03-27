@@ -32,10 +32,10 @@
     "processenv": "1.1.0",
     "sha1": "1.1.1",
     "streamtoarray": "1.1.0",
-    "tailwind": "4.0.0",
+    "tailwind": "thenativeweb/tailwind#a56accb82ace7e5eb5c6b6a853c5d2f644cf3f2c",
     "uuidv4": "3.0.1",
     "wolkenkit-api-shell": "1.1.1",
-    "wolkenkit-application": "5.0.0",
+    "wolkenkit-application": "thenativeweb/wolkenkit-application#f2405c36d6c6bcc5347fca278e73740565d32809",
     "wolkenkit-eventstore": "2.5.0"
   },
   "devDependencies": {
@@ -48,7 +48,7 @@
     "pg": "7.4.3",
     "pg-connection-string": "2.0.0",
     "record-stdstreams": "1.0.0",
-    "roboter": "4.0.2",
+    "roboter": "4.0.3",
     "runfork": "1.1.0",
     "shelljs": "0.8.3",
     "superagent": "4.1.0"

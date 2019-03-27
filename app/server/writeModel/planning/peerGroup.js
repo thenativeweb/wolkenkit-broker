@@ -5,10 +5,6 @@ const initialState = {
   destination: undefined,
   participants: [],
   isAuthorized: {
-    commands: {
-      start: { forPublic: true },
-      join: { forPublic: true }
-    },
     events: {
       started: { forPublic: true },
       joined: { forPublic: true }
@@ -17,12 +13,31 @@ const initialState = {
 };
 
 const commands = {
-  start () {
-    // ...
+  start: {
+    isAuthorized () {
+      return true;
+    },
+
+    handle () {
+      // ...
+    }
   },
 
-  join () {
-    // ...
+  join: {
+    schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: true
+    },
+
+    isAuthorized () {
+      return true;
+    },
+
+    handle () {
+      // ...
+    }
   }
 };
 
