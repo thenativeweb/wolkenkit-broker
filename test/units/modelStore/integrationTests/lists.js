@@ -842,11 +842,11 @@ const lists = function (options) {
           assert.that(items.length).is.equalTo(0);
         });
 
-        suite('transformations', () => {
+        suite('queries', () => {
           const peerGroupByJane = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
                 peerGroupByJohn = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe', 'Jane Doe' ]};
 
-          const setupTransformations = async function ({ transformations }) {
+          const setupQueries = async function ({ queries }) {
             const readModel = {
               lists: {
                 [modelName]: {
@@ -860,8 +860,8 @@ const lists = function (options) {
               }
             };
 
-            if (transformations) {
-              readModel.lists[modelName].transformations = transformations;
+            if (queries) {
+              readModel.lists[modelName].queries = queries;
             }
 
             const initializedReadModel = await initializeReadModel({ readModel });
@@ -877,8 +877,8 @@ const lists = function (options) {
           };
 
           suite('applyTransformations is false', () => {
-            test('do nothing if no transformations are given.', async () => {
-              await setupTransformations({ transformations: undefined });
+            test('do nothing if no queries are given.', async () => {
+              await setupQueries({ transformations: undefined });
               await addItemsToList();
 
               const stream = await listStore.read({
@@ -893,8 +893,8 @@ const lists = function (options) {
               assert.that(items[1]).is.equalTo(peerGroupByJohn);
             });
 
-            test('do nothing if no map and no filter transformation are given.', async () => {
-              await setupTransformations({ transformations: {}});
+            test('do nothing if no read item is given.', async () => {
+              await setupQueries({ queries: {}});
               await addItemsToList();
 
               const stream = await listStore.read({
@@ -909,14 +909,32 @@ const lists = function (options) {
               assert.that(items[1]).is.equalTo(peerGroupByJohn);
             });
 
-            test('do nothing if a map transformation is given.', async () => {
-              const transformations = {
-                map () {
-                  return { overridden: true };
+            test('do nothing if isAuthorized, filter and map are not given.', async () => {
+              await setupQueries({ queries: { readItem: {}}});
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if isAuthorized is given.', async () => {
+              const queries = {
+                readItem: {
+                  isAuthorized () {
+                    return false;
+                  }
                 }
               };
 
-              await setupTransformations({ transformations });
+              await setupQueries({ queries });
               await addItemsToList();
 
               const stream = await listStore.read({
@@ -931,14 +949,16 @@ const lists = function (options) {
               assert.that(items[1]).is.equalTo(peerGroupByJohn);
             });
 
-            test('do nothing if a map transformation throws an error.', async () => {
-              const transformations = {
-                map () {
-                  throw new Error('Map failed.');
+            test('do nothing if isAuthorized throws an error.', async () => {
+              const queries = {
+                readItem: {
+                  isAuthorized () {
+                    throw new Error('Is authorized failed.');
+                  }
                 }
               };
 
-              await setupTransformations({ transformations });
+              await setupQueries({ queries });
               await addItemsToList();
 
               const stream = await listStore.read({
@@ -953,62 +973,118 @@ const lists = function (options) {
               assert.that(items[1]).is.equalTo(peerGroupByJohn);
             });
 
-            test('do nothing if a filter transformation is given.', async () => {
-              const transformations = {
-                filter () {
+            test('do nothing if filter is given.', async () => {
+              const queries = {
+                readItem: {
+                  filter () {
+                    return false;
+                  }
+                }
+              };
+
+              await setupQueries({ queries });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if filter throws an error.', async () => {
+              const queries = {
+                readItem: {
+                  filter () {
+                    throw new Error('Filter failed.');
+                  }
+                }
+              };
+
+              await setupQueries({ queries });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if map is given.', async () => {
+              const queries = {
+                readItem: {
+                  map () {
+                    return { overridden: true };
+                  }
+                }
+              };
+
+              await setupQueries({ queries });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if map throws an error.', async () => {
+              const queries = {
+                readItem: {
+                  map () {
+                    throw new Error('Map failed.');
+                  }
+                }
+              };
+
+              await setupQueries({ queries });
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: false,
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('do nothing if isAuthorized, filter and map are given.', async () => {
+              const queries = {
+                isAuthorized () {
                   return false;
-                }
-              };
-
-              await setupTransformations({ transformations });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if a filter transformation throws an error.', async () => {
-              const transformations = {
-                filter () {
-                  throw new Error('Filter failed.');
-                }
-              };
-
-              await setupTransformations({ transformations });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if a map and a filter transformation are given.', async () => {
-              const transformations = {
-                map () {
-                  return { overridden: true };
                 },
 
                 filter () {
                   return false;
+                },
+
+                map () {
+                  return { overridden: true };
                 }
               };
 
-              await setupTransformations({ transformations });
+              await setupQueries({ queries });
               await addItemsToList();
 
               const stream = await listStore.read({
@@ -1025,8 +1101,8 @@ const lists = function (options) {
           });
 
           suite('applyTransformations is true', () => {
-            test('do nothing if no transformations are given.', async () => {
-              await setupTransformations({ transformations: undefined });
+            test('do nothing if no queries are given.', async () => {
+              await setupQueries({ queries: undefined });
               await addItemsToList();
 
               const stream = await listStore.read({
@@ -1042,8 +1118,8 @@ const lists = function (options) {
               assert.that(items[1]).is.equalTo(peerGroupByJohn);
             });
 
-            test('do nothing if no map and no filter transformation are given.', async () => {
-              await setupTransformations({ transformations: {}});
+            test('do nothing if no read item is given.', async () => {
+              await setupQueries({ queries: {}});
               await addItemsToList();
 
               const stream = await listStore.read({
@@ -1059,10 +1135,29 @@ const lists = function (options) {
               assert.that(items[1]).is.equalTo(peerGroupByJohn);
             });
 
-            test('map if a map transformation is given.', async () => {
-              await setupTransformations({ transformations: {
-                map (peerGroup) {
-                  return { ...peerGroup, initiator: peerGroup.initiator.toUpperCase() };
+            test('do nothing if isAuthorized, filter and map are not given.', async () => {
+              await setupQueries({ queries: { readItem: {}}});
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: true,
+                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo(peerGroupByJane);
+              assert.that(items[1]).is.equalTo(peerGroupByJohn);
+            });
+
+            test('filter if isAuthorized is given.', async () => {
+              await setupQueries({ queries: {
+                readItem: {
+                  isAuthorized (peerGroup, query) {
+                    return query.user.id === 'john.doe';
+                  }
                 }
               }});
               await addItemsToList();
@@ -1075,19 +1170,19 @@ const lists = function (options) {
               });
               const items = await toArray(stream);
 
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo({ ...peerGroupByJane, initiator: 'JANE DOE' });
-              assert.that(items[1]).is.equalTo({ ...peerGroupByJohn, initiator: 'JOHN DOE' });
+              assert.that(items.length).is.equalTo(0);
             });
 
-            test('skip if a map transformation throws an error.', async () => {
-              await setupTransformations({ transformations: {
-                map (peerGroup) {
-                  if (peerGroup.initiator === 'John Doe') {
-                    throw new Error('Map failed.');
-                  }
+            test('skip if isAuthorized throws an error.', async () => {
+              await setupQueries({ queries: {
+                readItem: {
+                  isAuthorized (peerGroup, query) {
+                    if (query.user.id === 'jane.doe') {
+                      throw new Error('Is authorized failed.');
+                    }
 
-                  return peerGroup;
+                    return true;
+                  }
                 }
               }});
               await addItemsToList();
@@ -1102,15 +1197,16 @@ const lists = function (options) {
               await assert.that(async () => {
                 await toArray(stream);
               }).is.throwingAsync(ex =>
-                ex.message === 'Map failed.' &&
-                ex.array.length === 1 &&
-                ex.array[0].initiator === peerGroupByJane.initiator);
+                ex.message === 'Is authorized failed.' &&
+                ex.array.length === 0);
             });
 
-            test('filter if a filter transformation is given.', async () => {
-              await setupTransformations({ transformations: {
-                filter (peerGroup) {
-                  return peerGroup.initiator === 'Jane Doe';
+            test('filter if filter is given.', async () => {
+              await setupQueries({ queries: {
+                readItem: {
+                  filter (peerGroup) {
+                    return peerGroup.initiator === 'Jane Doe';
+                  }
                 }
               }});
               await addItemsToList();
@@ -1127,14 +1223,16 @@ const lists = function (options) {
               assert.that(items[0]).is.equalTo(peerGroupByJane);
             });
 
-            test('skip if a filter transformation throws an error.', async () => {
-              await setupTransformations({ transformations: {
-                filter (peerGroup) {
-                  if (peerGroup.initiator === 'John Doe') {
-                    throw new Error('Filter failed.');
-                  }
+            test('skip if filter throws an error.', async () => {
+              await setupQueries({ queries: {
+                readItem: {
+                  filter (peerGroup) {
+                    if (peerGroup.initiator === 'John Doe') {
+                      throw new Error('Filter failed.');
+                    }
 
-                  return true;
+                    return true;
+                  }
                 }
               }});
               await addItemsToList();
@@ -1154,14 +1252,72 @@ const lists = function (options) {
                 ex.array[0].initiator === peerGroupByJane.initiator);
             });
 
-            test('map and filter if a map and a filter transformation are given.', async () => {
-              await setupTransformations({ transformations: {
-                map (peerGroup) {
-                  return { ...peerGroup, initiator: peerGroup.initiator.toUpperCase() };
-                },
+            test('map if map is given.', async () => {
+              await setupQueries({ queries: {
+                readItem: {
+                  map (peerGroup) {
+                    return { ...peerGroup, initiator: peerGroup.initiator.toUpperCase() };
+                  }
+                }
+              }});
+              await addItemsToList();
 
-                filter (peerGroup) {
-                  return peerGroup.initiator === 'Jane Doe';
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: true,
+                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
+                query: {}
+              });
+              const items = await toArray(stream);
+
+              assert.that(items.length).is.equalTo(2);
+              assert.that(items[0]).is.equalTo({ ...peerGroupByJane, initiator: 'JANE DOE' });
+              assert.that(items[1]).is.equalTo({ ...peerGroupByJohn, initiator: 'JOHN DOE' });
+            });
+
+            test('skip if map throws an error.', async () => {
+              await setupQueries({ queries: {
+                readItem: {
+                  map (peerGroup) {
+                    if (peerGroup.initiator === 'John Doe') {
+                      throw new Error('Map failed.');
+                    }
+
+                    return peerGroup;
+                  }
+                }
+              }});
+              await addItemsToList();
+
+              const stream = await listStore.read({
+                modelName,
+                applyTransformations: true,
+                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
+                query: {}
+              });
+
+              await assert.that(async () => {
+                await toArray(stream);
+              }).is.throwingAsync(ex =>
+                ex.message === 'Map failed.' &&
+                ex.array.length === 1 &&
+                ex.array[0].initiator === peerGroupByJane.initiator);
+            });
+
+            test('filter and map if isAuthorized, filter and map are given.', async () => {
+              await setupQueries({ queries: {
+                readItem: {
+                  isAuthorized (peerGroup, query) {
+                    return query.user.id === 'jane.doe';
+                  },
+
+                  filter (peerGroup) {
+                    return peerGroup.initiator === 'Jane Doe';
+                  },
+
+                  map (peerGroup) {
+                    return { ...peerGroup, initiator: peerGroup.initiator.toUpperCase() };
+                  }
                 }
               }});
               await addItemsToList();

@@ -35,7 +35,7 @@
     "tailwind": "4.0.0",
     "uuidv4": "3.0.1",
     "wolkenkit-api-shell": "1.1.1",
-    "wolkenkit-application": "4.3.0",
+    "wolkenkit-application": "5.0.0",
     "wolkenkit-eventstore": "2.5.0"
   },
   "devDependencies": {

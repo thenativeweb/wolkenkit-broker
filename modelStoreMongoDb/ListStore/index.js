@@ -295,15 +295,29 @@ class ListStore extends EventEmitter {
     const transformedResult = new Transform({
       objectMode: true,
       transform (item, encoding, callback) {
-        const { transformations } = readModel[modelName];
+        const { queries } = readModel[modelName];
 
-        if (!transformations) {
+        if (!queries || !queries.readItem) {
           this.push(item);
 
           return callback(null);
         }
 
-        const { filter, map } = transformations;
+        const { isAuthorized, filter, map } = queries.readItem;
+
+        if (isAuthorized) {
+          let keepItem;
+
+          try {
+            keepItem = isAuthorized(item, { ...query, user });
+          } catch (ex) {
+            return callback(ex);
+          }
+
+          if (!keepItem) {
+            return callback(null);
+          }
+        }
 
         if (filter) {
           let keepItem;
