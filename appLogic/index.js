@@ -4,7 +4,14 @@ const { PassThrough } = require('stream');
 
 const getEventHandlingStrategies = require('./getEventHandlingStrategies');
 
-const appLogic = function ({ app, eventSequencer, eventStore, modelStore, readModel }) {
+const appLogic = function ({
+  app,
+  eventSequencer,
+  eventStore,
+  modelStore,
+  writeModel,
+  readModel
+}) {
   if (!app) {
     throw new Error('App is missing.');
   }
@@ -16,6 +23,9 @@ const appLogic = function ({ app, eventSequencer, eventStore, modelStore, readMo
   }
   if (!modelStore) {
     throw new Error('Model store is missing.');
+  }
+  if (!writeModel) {
+    throw new Error('Write model is missing.');
   }
   if (!readModel) {
     throw new Error('Read model is missing.');
@@ -39,7 +49,16 @@ const appLogic = function ({ app, eventSequencer, eventStore, modelStore, readMo
     });
   });
 
-  app.api.read = async function (modelType, modelName, { where, orderBy, skip, take, user }) {
+  app.api.read = async function ({ modelType, modelName, user, query: { where, orderBy, skip, take }}) {
+    if (!modelType) {
+      throw new Error('Model type is missing.');
+    }
+    if (!modelName) {
+      throw new Error('Model name is missing.');
+    }
+    if (!user) {
+      throw new Error('User is missing.');
+    }
     if (!where) {
       throw new Error('Where is missing.');
     }
@@ -52,15 +71,12 @@ const appLogic = function ({ app, eventSequencer, eventStore, modelStore, readMo
     if (take === undefined) {
       throw new Error('Take is missing.');
     }
-    if (!user) {
-      throw new Error('User is missing.');
-    }
 
     const incomingStream = await modelStore.read({
       modelType,
       modelName,
-      applyTransformations: true,
       user,
+      applyTransformations: true,
       query: { where, orderBy, skip, take }
     });
 
@@ -87,27 +103,72 @@ const appLogic = function ({ app, eventSequencer, eventStore, modelStore, readMo
     return outgoingStream;
   };
 
-  app.api.incoming.on('data', command => {
-    logger.info('Received command.', command);
-    app.commandbus.outgoing.write(command);
-    logger.info('Sent command.', command);
-  });
-
-  app.eventbus.incoming.on('data', async domainEvent => {
-    logger.info('Received event.', { domainEvent });
-
-    const strategy = eventSequencer.getStrategyFor(domainEvent);
-
-    try {
-      await eventHandlingStrategies[strategy.type](domainEvent, strategy);
-    } catch (ex) {
-      logger.error('Failed to handle event.', { domainEvent, ex });
-
-      return domainEvent.discard();
+  app.api.willPublishEvent = async function ({ event, metadata: { state, previousState, client }}) {
+    if (event.type === 'readModel') {
+      // TODO: isAuthorized für Liste? => readList statt readItem
+      return event;
     }
 
-    logger.info('Successfully handled event.', { domainEvent });
-    domainEvent.next();
+    const {
+      isAuthorized,
+      filter,
+      map
+    } = writeModel[event.context.name][event.aggregate.name].events[event.name];
+
+    const aggregateInstance = new app.ReadableAggregate({
+      writeModel,
+      content: { name: event.context.name },
+      aggregate: { name: event.aggregate.name, id: event.aggregate.id }
+    });
+
+    aggregateInstance.applySnapshot({
+      revision: event.metadata.revision,
+      state
+    });
+
+    // Additionally, attach the previous state, and do this in the same way as
+    // applySnapshot works.
+    aggregateInstance.api.forReadOnly.previousState = previousState;
+    aggregateInstance.api.forEvents.previousState = previousState;
+
+    try {
+      // TODO: Inject services ...
+      if (!await isAuthorized(aggregateInstance, event, { client })) {
+        return;
+      }
+    } catch (ex) {
+      // Ignore the exception and return.
+      // TODO: Log
+      return;
+    }
+
+    // TODO: filter
+    // TODO: map
+
+    return event;
+  };
+
+  app.api.incoming.on('data', ({ command, metadata }) => {
+    logger.info('Received command.', { command, metadata });
+    app.commandbus.outgoing.write({ command, metadata });
+    logger.info('Sent command.', { command, metadata });
+  });
+
+  app.eventbus.incoming.on('data', async ({ event, metadata, actions }) => {
+    logger.info('Received event.', { event, metadata });
+
+    const strategy = eventSequencer.getStrategyFor(event);
+
+    try {
+      await eventHandlingStrategies[strategy.type]({ event, metadata, strategy });
+    } catch (ex) {
+      logger.error('Failed to handle event.', { event, metadata, ex });
+
+      return actions.discard();
+    }
+
+    logger.info('Successfully handled event.', { event, metadata });
+    actions.next();
   });
 };
 

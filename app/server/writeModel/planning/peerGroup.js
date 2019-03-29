@@ -3,13 +3,7 @@
 const initialState = {
   initiator: undefined,
   destination: undefined,
-  participants: [],
-  isAuthorized: {
-    events: {
-      started: { forPublic: true },
-      joined: { forPublic: true }
-    }
-  }
+  participants: []
 };
 
 const commands = {
@@ -42,12 +36,24 @@ const commands = {
 };
 
 const events = {
-  started () {
-    // ...
+  started: {
+    handle () {
+      // ...
+    },
+
+    isAuthorized () {
+      return true;
+    }
   },
 
-  joined () {
-    // ...
+  joined: {
+    handle () {
+      // ...
+    },
+
+    isAuthorized () {
+      return true;
+    }
   }
 };
 

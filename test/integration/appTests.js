@@ -519,7 +519,11 @@ suite('integrationTests', function () {
       eventJoined2.metadata.revision = 3;
 
       const savedEvents = await eventStore.saveEvents({
-        events: [ eventStarted, eventJoined1, eventJoined2 ]
+        uncommittedEvents: [
+          { event: eventStarted, state: {}},
+          { event: eventJoined1, state: {}},
+          { event: eventJoined2, state: {}}
+        ]
       });
 
       const lastPosition = savedEvents[2].metadata.position;
@@ -570,7 +574,11 @@ suite('integrationTests', function () {
       eventJoined2.metadata.revision = 3;
 
       const savedEvents = await eventStore.saveEvents({
-        events: [ eventStarted, eventJoined1, eventJoined2 ]
+        uncommittedEvents: [
+          { event: eventStarted, state: {}},
+          { event: eventJoined1, state: {}},
+          { event: eventJoined2, state: {}}
+        ]
       });
 
       const lastPosition = savedEvents[2].metadata.position;
@@ -630,7 +638,10 @@ suite('integrationTests', function () {
       eventJoined3.metadata.revision = 4;
 
       let savedEvents = await eventStore.saveEvents({
-        events: [ eventStarted, eventJoined1 ]
+        uncommittedEvents: [
+          { event: eventStarted, state: {}},
+          { event: eventJoined1, state: {}}
+        ]
       });
 
       let lastPosition = savedEvents[1].metadata.position;
@@ -663,7 +674,10 @@ suite('integrationTests', function () {
       });
 
       savedEvents = await eventStore.saveEvents({
-        events: [ eventJoined2, eventJoined3 ]
+        uncommittedEvents: [
+          { event: eventJoined2, state: {}},
+          { event: eventJoined3, state: {}}
+        ]
       });
 
       lastPosition = savedEvents[1].metadata.position;

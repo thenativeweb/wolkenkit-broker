@@ -42,23 +42,27 @@ const getEventHandlingStrategies = function ({ app, eventStore, modelStore, read
       });
     },
 
-    async forward (domainEvent) {
-      app.api.outgoing.write(domainEvent);
+    async forward ({ event, metadata }) {
+      app.api.outgoing.write({ event, metadata });
     },
 
-    async proceed (domainEvent, strategy) {
+    async proceed ({ event, metadata, strategy }) {
+      const domainEvent = event;
       const modelEvents = await eventHandler.handle(domainEvent);
 
       await modelStore.processEvents(domainEvent, modelEvents);
 
-      if (strategy.forward === false) {
+      if (!strategy.forward) {
         return;
       }
 
-      app.api.outgoing.write(domainEvent);
+      app.api.outgoing.write({ event: domainEvent, metadata });
 
       modelEvents.forEach(modelEvent => {
-        app.api.outgoing.write(modelEvent);
+        const previousState = {},
+              state = {};
+
+        app.api.outgoing.write({ event: modelEvent, metadata: { previousState, state }});
       });
     }
   };

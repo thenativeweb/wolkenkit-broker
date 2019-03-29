@@ -118,7 +118,14 @@ const loggerSystem = flaschenpost.getLogger();
       corsOrigin: app.env('STATUS_CORS_ORIGIN')
     }));
 
-    logic({ app, eventSequencer, eventStore, modelStore, readModel: application.readModel });
+    logic({
+      app,
+      eventSequencer,
+      eventStore,
+      modelStore,
+      writeModel: application.writeModel,
+      readModel: application.readModel
+    });
   } catch (ex) {
     loggerSystem.fatal('An unexpected error occured.', { err: ex });
 
