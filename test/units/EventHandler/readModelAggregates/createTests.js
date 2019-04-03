@@ -18,13 +18,27 @@ const readModel = {
 const modelStore = {};
 
 suite('create', () => {
-  let domainEvent;
+  let domainEvent,
+      domainEventMetadata,
+      tokens,
+      users;
 
   setup(() => {
+    tokens = {
+      jane: { sub: uuid() }
+    };
+    users = {
+      jane: { id: tokens.jane.sub, token: tokens.jane }
+    };
+
     domainEvent = buildEvent('planning', 'peerGroup', uuid(), 'started', {
       initiator: 'Jane Doe',
       destination: 'Riva'
     });
+
+    domainEvent.addInitiator(users.jane);
+
+    domainEventMetadata = { state: {}, previousState: {}};
   });
 
   test('is a function.', async () => {
@@ -55,6 +69,18 @@ suite('create', () => {
     }).is.throwing('Model name is missing.');
   });
 
+  test('throws an error if domain event is given, but domain event metadata are missing.', async () => {
+    assert.that(() => {
+      create({ readModel, modelStore, modelType: 'lists', modelName: 'peerGroups', domainEvent });
+    }).is.throwing('Domain event metadata are missing.');
+  });
+
+  test('throws an error if domain event metadata are given, but domain event is missing.', async () => {
+    assert.that(() => {
+      create({ readModel, modelStore, modelType: 'lists', modelName: 'peerGroups', domainEventMetadata });
+    }).is.throwing('Domain event is missing.');
+  });
+
   suite('read model aggregate', () => {
     test('is an object.', async () => {
       const readModelAggregate = create({
@@ -62,7 +88,8 @@ suite('create', () => {
         modelStore,
         modelType: 'lists',
         modelName: 'peerGroups',
-        domainEvent
+        domainEvent,
+        domainEventMetadata
       });
 
       assert.that(readModelAggregate).is.ofType('object');
@@ -74,7 +101,8 @@ suite('create', () => {
         modelStore,
         modelType: 'lists',
         modelName: 'peerGroups',
-        domainEvent
+        domainEvent,
+        domainEventMetadata
       });
 
       assert.that(readModelAggregate.uncommittedEvents).is.equalTo([]);
@@ -86,7 +114,8 @@ suite('create', () => {
         modelStore,
         modelType: 'lists',
         modelName: 'peerGroups',
-        domainEvent
+        domainEvent,
+        domainEventMetadata
       });
 
       assert.that(readModelAggregate).is.instanceOf(ListAggregate.Writable);
@@ -98,7 +127,8 @@ suite('create', () => {
         modelStore,
         modelType: 'lists',
         modelName: 'peerGroups',
-        domainEvent
+        domainEvent,
+        domainEventMetadata
       });
 
       assert.that(readModelAggregate).is.instanceOf(ListAggregate.Writable);
@@ -121,20 +151,21 @@ suite('create', () => {
         modelStore,
         modelType: 'lists',
         modelName: 'peerGroups',
-        domainEvent
+        domainEvent,
+        domainEventMetadata
       });
       const id = uuid();
 
       readModelAggregate.add({ id, initiator: 'Jane Doe' });
 
       assert.that(readModelAggregate.uncommittedEvents.length).is.equalTo(1);
-      assert.that(readModelAggregate.uncommittedEvents[0].data.payload).is.equalTo({
+      assert.that(readModelAggregate.uncommittedEvents[0].event.data.payload).is.equalTo({
         id,
         initiator: 'Jane Doe',
         destination: '',
-        participants: [],
-        isAuthorized: domainEvent.metadata.isAuthorized
+        participants: []
       });
+      assert.that(readModelAggregate.uncommittedEvents[0].event.initiator.id).is.equalTo(users.jane.id);
     });
   });
 });

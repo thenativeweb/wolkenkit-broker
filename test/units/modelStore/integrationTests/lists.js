@@ -195,7 +195,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -277,7 +276,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -288,57 +286,6 @@ const lists = function (options) {
             initiator: 'Jane Doe',
             destination: 'Sultan Saray',
             participants: [ 'Jane Doe' ]
-          });
-        });
-
-        test('merges the given authorization options with the existing ones.', async () => {
-          const payloadAdd = {
-            id: uuid(),
-            initiator: 'Jane Doe',
-            destination: 'Riva',
-            participants: [],
-            isAuthorized: {
-              owner: 'jane.doe',
-              forAuthenticated: true,
-              forPublic: true
-            }
-          };
-
-          await listStore.added({ modelName, payload: payloadAdd });
-
-          const selector = { id: payloadAdd.id };
-          const payloadUpdate = {
-            add: {},
-            update: {
-              destination: 'Sultan Saray',
-              participants: { $add: 'Jane Doe' },
-              isAuthorized: {
-                forPublic: false
-              }
-            }
-          };
-
-          await listStore.upserted({ modelName, selector, payload: payloadUpdate });
-
-          const stream = await listStore.read({
-            modelType: 'lists',
-            modelName,
-            applyTransformations: false,
-            query: {}
-          });
-          const peerGroups = await toArray(stream);
-
-          assert.that(peerGroups.length).is.equalTo(1);
-          assert.that(peerGroups[0]).is.equalTo({
-            id: payloadAdd.id,
-            initiator: 'Jane Doe',
-            destination: 'Sultan Saray',
-            participants: [ 'Jane Doe' ],
-            isAuthorized: {
-              owner: 'jane.doe',
-              forAuthenticated: true,
-              forPublic: false
-            }
           });
         });
 
@@ -360,7 +307,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -398,7 +344,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -432,7 +377,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -466,7 +410,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -530,7 +473,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -541,52 +483,6 @@ const lists = function (options) {
             initiator: 'Jane Doe',
             destination: 'Sultan Saray',
             participants: [ 'Jane Doe' ]
-          });
-        });
-
-        test('merges the given authorization options with the existing ones.', async () => {
-          const payloadAdd = {
-            id: uuid(),
-            initiator: 'Jane Doe',
-            destination: 'Riva',
-            participants: [],
-            isAuthorized: {
-              owner: 'jane.doe',
-              forAuthenticated: true,
-              forPublic: true
-            }
-          };
-
-          await listStore.added({ modelName, payload: payloadAdd });
-
-          const selector = { id: payloadAdd.id };
-          const payloadUpdate = {
-            destination: 'Sultan Saray',
-            participants: { $add: 'Jane Doe' },
-            isAuthorized: { forPublic: false }
-          };
-
-          await listStore.updated({ modelName, selector, payload: payloadUpdate });
-
-          const stream = await listStore.read({
-            modelType: 'lists',
-            modelName,
-            applyTransformations: false,
-            query: {}
-          });
-          const peerGroups = await toArray(stream);
-
-          assert.that(peerGroups.length).is.equalTo(1);
-          assert.that(peerGroups[0]).is.equalTo({
-            id: payloadAdd.id,
-            initiator: 'Jane Doe',
-            destination: 'Sultan Saray',
-            participants: [ 'Jane Doe' ],
-            isAuthorized: {
-              owner: 'jane.doe',
-              forAuthenticated: true,
-              forPublic: false
-            }
           });
         });
 
@@ -605,7 +501,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -640,7 +535,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -690,7 +584,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -712,7 +605,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -734,7 +626,6 @@ const lists = function (options) {
           const stream = await listStore.read({
             modelType: 'lists',
             modelName,
-            applyTransformations: false,
             query: {}
           });
           const peerGroups = await toArray(stream);
@@ -760,21 +651,9 @@ const lists = function (options) {
           }).is.throwingAsync('Model name is missing.');
         });
 
-        test('throws an error if apply transformations is missing.', async () => {
-          await assert.that(async () => {
-            await listStore.read({ modelName: 'foo' });
-          }).is.throwingAsync('Apply transformations is missing.');
-        });
-
-        test('throws an error if user is missing if apply transformations is enabled.', async () => {
-          await assert.that(async () => {
-            await listStore.read({ modelName: 'foo', applyTransformations: true });
-          }).is.throwingAsync('User is missing.');
-        });
-
         test('throws an error if query is missing.', async () => {
           await assert.that(async () => {
-            await listStore.read({ modelName: 'foo', applyTransformations: false });
+            await listStore.read({ modelName: 'foo' });
           }).is.throwingAsync('Query is missing.');
         });
 
@@ -787,11 +666,7 @@ const lists = function (options) {
 
           const query = {};
 
-          const stream = await listStore.read({
-            modelName,
-            applyTransformations: false,
-            query
-          });
+          const stream = await listStore.read({ modelName, query });
           const items = await toArray(stream);
 
           assert.that(items.length).is.equalTo(2);
@@ -810,11 +685,7 @@ const lists = function (options) {
             where: { initiator: 'Jane Doe' }
           };
 
-          const stream = await listStore.read({
-            modelName,
-            applyTransformations: false,
-            query
-          });
+          const stream = await listStore.read({ modelName, query });
           const items = await toArray(stream);
 
           assert.that(items.length).is.equalTo(1);
@@ -832,11 +703,7 @@ const lists = function (options) {
             where: { initiator: 'Jessy Doe' }
           };
 
-          const stream = await listStore.read({
-            modelName,
-            applyTransformations: false,
-            query
-          });
+          const stream = await listStore.read({ modelName, query });
           const items = await toArray(stream);
 
           assert.that(items.length).is.equalTo(0);
@@ -875,465 +742,6 @@ const lists = function (options) {
             await listStore.added({ modelName, payload: peerGroupByJane });
             await listStore.added({ modelName, payload: peerGroupByJohn });
           };
-
-          suite('applyTransformations is false', () => {
-            test('do nothing if no queries are given.', async () => {
-              await setupQueries({ transformations: undefined });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if no read item is given.', async () => {
-              await setupQueries({ queries: {}});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if isAuthorized, filter and map are not given.', async () => {
-              await setupQueries({ queries: { readItem: {}}});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if isAuthorized is given.', async () => {
-              const queries = {
-                readItem: {
-                  isAuthorized () {
-                    return false;
-                  }
-                }
-              };
-
-              await setupQueries({ queries });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if isAuthorized throws an error.', async () => {
-              const queries = {
-                readItem: {
-                  isAuthorized () {
-                    throw new Error('Is authorized failed.');
-                  }
-                }
-              };
-
-              await setupQueries({ queries });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if filter is given.', async () => {
-              const queries = {
-                readItem: {
-                  filter () {
-                    return false;
-                  }
-                }
-              };
-
-              await setupQueries({ queries });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if filter throws an error.', async () => {
-              const queries = {
-                readItem: {
-                  filter () {
-                    throw new Error('Filter failed.');
-                  }
-                }
-              };
-
-              await setupQueries({ queries });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if map is given.', async () => {
-              const queries = {
-                readItem: {
-                  map () {
-                    return { overridden: true };
-                  }
-                }
-              };
-
-              await setupQueries({ queries });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if map throws an error.', async () => {
-              const queries = {
-                readItem: {
-                  map () {
-                    throw new Error('Map failed.');
-                  }
-                }
-              };
-
-              await setupQueries({ queries });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if isAuthorized, filter and map are given.', async () => {
-              const queries = {
-                isAuthorized () {
-                  return false;
-                },
-
-                filter () {
-                  return false;
-                },
-
-                map () {
-                  return { overridden: true };
-                }
-              };
-
-              await setupQueries({ queries });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: false,
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-          });
-
-          suite('applyTransformations is true', () => {
-            test('do nothing if no queries are given.', async () => {
-              await setupQueries({ queries: undefined });
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: true,
-                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if no read item is given.', async () => {
-              await setupQueries({ queries: {}});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: true,
-                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('do nothing if isAuthorized, filter and map are not given.', async () => {
-              await setupQueries({ queries: { readItem: {}}});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: true,
-                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-              assert.that(items[1]).is.equalTo(peerGroupByJohn);
-            });
-
-            test('filter if isAuthorized is given.', async () => {
-              await setupQueries({ queries: {
-                readItem: {
-                  isAuthorized (peerGroup, query) {
-                    return query.user.id === 'john.doe';
-                  }
-                }
-              }});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: true,
-                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(0);
-            });
-
-            test('skip if isAuthorized throws an error.', async () => {
-              await setupQueries({ queries: {
-                readItem: {
-                  isAuthorized (peerGroup, query) {
-                    if (query.user.id === 'jane.doe') {
-                      throw new Error('Is authorized failed.');
-                    }
-
-                    return true;
-                  }
-                }
-              }});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: true,
-                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
-                query: {}
-              });
-
-              await assert.that(async () => {
-                await toArray(stream);
-              }).is.throwingAsync(ex =>
-                ex.message === 'Is authorized failed.' &&
-                ex.array.length === 0);
-            });
-
-            test('filter if filter is given.', async () => {
-              await setupQueries({ queries: {
-                readItem: {
-                  filter (peerGroup) {
-                    return peerGroup.initiator === 'Jane Doe';
-                  }
-                }
-              }});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: true,
-                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(1);
-              assert.that(items[0]).is.equalTo(peerGroupByJane);
-            });
-
-            test('skip if filter throws an error.', async () => {
-              await setupQueries({ queries: {
-                readItem: {
-                  filter (peerGroup) {
-                    if (peerGroup.initiator === 'John Doe') {
-                      throw new Error('Filter failed.');
-                    }
-
-                    return true;
-                  }
-                }
-              }});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: true,
-                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
-                query: {}
-              });
-
-              await assert.that(async () => {
-                await toArray(stream);
-              }).is.throwingAsync(ex =>
-                ex.message === 'Filter failed.' &&
-                ex.array.length === 1 &&
-                ex.array[0].initiator === peerGroupByJane.initiator);
-            });
-
-            test('map if map is given.', async () => {
-              await setupQueries({ queries: {
-                readItem: {
-                  map (peerGroup) {
-                    return { ...peerGroup, initiator: peerGroup.initiator.toUpperCase() };
-                  }
-                }
-              }});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: true,
-                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(2);
-              assert.that(items[0]).is.equalTo({ ...peerGroupByJane, initiator: 'JANE DOE' });
-              assert.that(items[1]).is.equalTo({ ...peerGroupByJohn, initiator: 'JOHN DOE' });
-            });
-
-            test('skip if map throws an error.', async () => {
-              await setupQueries({ queries: {
-                readItem: {
-                  map (peerGroup) {
-                    if (peerGroup.initiator === 'John Doe') {
-                      throw new Error('Map failed.');
-                    }
-
-                    return peerGroup;
-                  }
-                }
-              }});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: true,
-                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
-                query: {}
-              });
-
-              await assert.that(async () => {
-                await toArray(stream);
-              }).is.throwingAsync(ex =>
-                ex.message === 'Map failed.' &&
-                ex.array.length === 1 &&
-                ex.array[0].initiator === peerGroupByJane.initiator);
-            });
-
-            test('filter and map if isAuthorized, filter and map are given.', async () => {
-              await setupQueries({ queries: {
-                readItem: {
-                  isAuthorized (peerGroup, query) {
-                    return query.user.id === 'jane.doe';
-                  },
-
-                  filter (peerGroup) {
-                    return peerGroup.initiator === 'Jane Doe';
-                  },
-
-                  map (peerGroup) {
-                    return { ...peerGroup, initiator: peerGroup.initiator.toUpperCase() };
-                  }
-                }
-              }});
-              await addItemsToList();
-
-              const stream = await listStore.read({
-                modelName,
-                applyTransformations: true,
-                user: { id: 'jane.doe', token: { sub: 'jane.doe' }},
-                query: {}
-              });
-              const items = await toArray(stream);
-
-              assert.that(items.length).is.equalTo(1);
-              assert.that(items[0]).is.equalTo({ ...peerGroupByJane, initiator: 'JANE DOE' });
-            });
-          });
         });
       });
     });
@@ -1350,8 +758,14 @@ const lists = function (options) {
 
         // Add and update.
         await modelStore.processEvents(domainEvent, [
-          buildModelEvent('lists', modelName, 'added', { payload: { id, initiator: 'Jane Doe', destination: 'Riva', participants: [], stars: 0 }}),
-          buildModelEvent('lists', modelName, 'updated', { selector: { id }, payload: { participants: { $add: 'Jane Doe' }}})
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id, initiator: 'Jane Doe', destination: 'Riva', participants: [], stars: 0 }}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'updated', { selector: { id }, payload: { participants: { $add: 'Jane Doe' }}}),
+            metadata: { domainEvent }
+          }
         ]);
 
         // Read.
@@ -1363,9 +777,10 @@ const lists = function (options) {
         ]);
 
         // Teardown.
-        await modelStore.processEvents(domainEvent, [
-          buildModelEvent('lists', modelName, 'removed', { selector: {}})
-        ]);
+        await modelStore.processEvents(domainEvent, [{
+          event: buildModelEvent('lists', modelName, 'removed', { selector: {}}),
+          metadata: { domainEvent }
+        }]);
       });
 
       test('add, update and remove multiple items.', async () => {
@@ -1373,14 +788,38 @@ const lists = function (options) {
 
         // Add, update and remove.
         await modelStore.processEvents(domainEvent, [
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], initiator: 'Jane Doe', destination: 'Riva', participants: [], stars: 0 }}),
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], initiator: 'John Doe', destination: 'Sultan Saray', participants: [], stars: 0 }}),
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], initiator: 'Jessica Doe', destination: 'Moulou', participants: [], stars: 0 }}),
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[3], initiator: 'James Doe', destination: 'Kurose', participants: [], stars: 0 }}),
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[4], initiator: 'Jeanette Doe', destination: 'Riva', participants: [], stars: 0 }}),
-          buildModelEvent('lists', modelName, 'updated', { selector: { destination: 'Riva' }, payload: { destination: 'Sultan Saray', stars: { $incrementBy: 2 }}}),
-          buildModelEvent('lists', modelName, 'updated', { selector: { initiator: 'Jessica Doe' }, payload: { destination: 'Sans', participants: { $add: 'Jim Doe' }}}),
-          buildModelEvent('lists', modelName, 'removed', { selector: { id: id[1] }})
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], initiator: 'Jane Doe', destination: 'Riva', participants: [], stars: 0 }}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], initiator: 'John Doe', destination: 'Sultan Saray', participants: [], stars: 0 }}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], initiator: 'Jessica Doe', destination: 'Moulou', participants: [], stars: 0 }}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[3], initiator: 'James Doe', destination: 'Kurose', participants: [], stars: 0 }}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[4], initiator: 'Jeanette Doe', destination: 'Riva', participants: [], stars: 0 }}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'updated', { selector: { destination: 'Riva' }, payload: { destination: 'Sultan Saray', stars: { $incrementBy: 2 }}}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'updated', { selector: { initiator: 'Jessica Doe' }, payload: { destination: 'Sans', participants: { $add: 'Jim Doe' }}}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'removed', { selector: { id: id[1] }}),
+            metadata: { domainEvent }
+          }
         ]);
 
         // Read.
@@ -1395,9 +834,10 @@ const lists = function (options) {
         ]);
 
         // Teardown.
-        await modelStore.processEvents(domainEvent, [
-          buildModelEvent('lists', modelName, 'removed', { selector: {}})
-        ]);
+        await modelStore.processEvents(domainEvent, [{
+          event: buildModelEvent('lists', modelName, 'removed', { selector: {}}),
+          metadata: { domainEvent }
+        }]);
       });
 
       test('add and remove items to and from arrays.', async () => {
@@ -1405,13 +845,34 @@ const lists = function (options) {
 
         // Add and update.
         await modelStore.processEvents(domainEvent, [
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], participants: []}}),
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], participants: [ 'John Doe' ]}}),
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], participants: [ 'John Doe', 'Jennifer Doe' ]}}),
-          buildModelEvent('lists', modelName, 'updated', { selector: { id: id[0] }, payload: { participants: { $add: 'Jane Doe' }}}),
-          buildModelEvent('lists', modelName, 'updated', { selector: { id: id[1] }, payload: { participants: { $add: 'Jane Doe' }}}),
-          buildModelEvent('lists', modelName, 'updated', { selector: { id: id[1] }, payload: { participants: { $remove: 'John Doe' }}}),
-          buildModelEvent('lists', modelName, 'updated', { selector: { id: id[2] }, payload: { participants: { $remove: 'John Doe' }}})
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], participants: []}}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], participants: [ 'John Doe' ]}}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], participants: [ 'John Doe', 'Jennifer Doe' ]}}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'updated', { selector: { id: id[0] }, payload: { participants: { $add: 'Jane Doe' }}}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'updated', { selector: { id: id[1] }, payload: { participants: { $add: 'Jane Doe' }}}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'updated', { selector: { id: id[1] }, payload: { participants: { $remove: 'John Doe' }}}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'updated', { selector: { id: id[2] }, payload: { participants: { $remove: 'John Doe' }}}),
+            metadata: { domainEvent }
+          }
         ]);
 
         // Read.
@@ -1428,9 +889,10 @@ const lists = function (options) {
         ]);
 
         // Teardown.
-        await modelStore.processEvents(domainEvent, [
-          buildModelEvent('lists', modelName, 'removed', { selector: {}})
-        ]);
+        await modelStore.processEvents(domainEvent, [{
+          event: buildModelEvent('lists', modelName, 'removed', { selector: {}}),
+          metadata: { domainEvent }
+        }]);
       });
     });
 
@@ -1465,16 +927,26 @@ const lists = function (options) {
         domainEvent = buildDomainEvent('planning', 'peerGroup', 'joined', { participant: 'Jane Doe' });
 
         await modelStore.processEvents(domainEvent, [
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], initiator: 'Jane Doe', destination: 'Riva', participants: [ 'Jane Doe' ], stars: 2 }}),
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe' ], stars: 0 }}),
-          buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], initiator: 'Jennifer Doe', destination: 'Sultan Saray', participants: [ 'Jane Doe', 'Jennifer Doe' ], stars: 1 }})
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[0], initiator: 'Jane Doe', destination: 'Riva', participants: [ 'Jane Doe' ], stars: 2 }}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[1], initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe' ], stars: 0 }}),
+            metadata: { domainEvent }
+          },
+          {
+            event: buildModelEvent('lists', modelName, 'added', { payload: { id: id[2], initiator: 'Jennifer Doe', destination: 'Sultan Saray', participants: [ 'Jane Doe', 'Jennifer Doe' ], stars: 1 }}),
+            metadata: { domainEvent }
+          }
         ]);
       });
 
       teardown(async () => {
-        await modelStore.processEvents(domainEvent, [
-          buildModelEvent('lists', modelName, 'removed', { selector: {}})
-        ]);
+        await modelStore.processEvents(domainEvent, [{
+          event: buildModelEvent('lists', modelName, 'removed', { selector: {}}),
+          metadata: { domainEvent }
+        }]);
       });
 
       suite('readOne', () => {

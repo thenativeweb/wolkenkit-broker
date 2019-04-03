@@ -2,7 +2,7 @@
 
 const memoize = require('lodash/memoize');
 
-const createReadModelAggregate = require('../readModelAggregates/create');
+const createReadModelAggregate = require('../EventHandler/readModelAggregates/create');
 
 const getApp = function ({ readModel, modelStore }) {
   if (!readModel) {

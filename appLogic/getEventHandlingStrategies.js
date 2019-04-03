@@ -25,7 +25,8 @@ const getEventHandlingStrategies = function ({ app, eventStore, modelStore, read
       logger.info('Skipped event.', domainEvent);
     },
 
-    async replay (domainEvent, strategy) {
+    async replay ({ event, metadata, strategy }) {
+      const domainEvent = event;
       const { fromPosition, toPosition } = strategy;
 
       logger.info('Replaying events...', { fromPosition, toPosition });
@@ -37,7 +38,11 @@ const getEventHandlingStrategies = function ({ app, eventStore, modelStore, read
         async handleReplayedDomainEvent (replayedDomainEvent) {
           const isLastEvent = replayedDomainEvent.metadata.position === domainEvent.metadata.position;
 
-          await strategies.proceed(replayedDomainEvent, { type: 'proceed', forward: isLastEvent });
+          await strategies.proceed({
+            event: replayedDomainEvent,
+            metadata,
+            strategy: { type: 'proceed', forward: isLastEvent }
+          });
         }
       });
     },
@@ -47,23 +52,22 @@ const getEventHandlingStrategies = function ({ app, eventStore, modelStore, read
     },
 
     async proceed ({ event, metadata, strategy }) {
-      const domainEvent = event;
-      const modelEvents = await eventHandler.handle(domainEvent);
+      const modelEvents = await eventHandler.handle({ event, metadata });
 
-      await modelStore.processEvents(domainEvent, modelEvents);
+      await modelStore.processEvents(event, modelEvents);
 
       if (!strategy.forward) {
         return;
       }
 
-      app.api.outgoing.write({ event: domainEvent, metadata });
+      await this.forward({ event, metadata });
 
-      modelEvents.forEach(modelEvent => {
-        const previousState = {},
-              state = {};
-
-        app.api.outgoing.write({ event: modelEvent, metadata: { previousState, state }});
-      });
+      for (const modelEvent of modelEvents) {
+        await this.forward({
+          event: modelEvent.event,
+          metadata: modelEvent.metadata
+        });
+      }
     }
   };
 

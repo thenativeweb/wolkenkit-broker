@@ -1,7 +1,7 @@
 'use strict';
 
 const createReadModelAggregate = require('./readModelAggregates/create'),
-      getServices = require('./services/get');
+      getServices = require('../services/getForReadModelEventHandler');
 
 class EventHandler {
   constructor ({ app, readModel, modelStore }) {
@@ -38,19 +38,22 @@ class EventHandler {
     });
   }
 
-  async handle (domainEvent) {
-    if (!domainEvent) {
-      throw new Error('Domain event is missing.');
+  async handle ({ event, metadata }) {
+    if (!event) {
+      throw new Error('Event is missing.');
+    }
+    if (!metadata) {
+      throw new Error('Metadata are missing.');
     }
 
-    const eventName = `${domainEvent.context.name}.${domainEvent.aggregate.name}.${domainEvent.name}`;
+    const eventName = `${event.context.name}.${event.aggregate.name}.${event.name}`;
     const modelEvents = [];
 
     if (!this.eventListeners[eventName]) {
       return modelEvents;
     }
 
-    domainEvent.fail = function (reason) {
+    event.fail = function (reason) {
       throw new Error(reason);
     };
 
@@ -65,13 +68,21 @@ class EventHandler {
         modelStore,
         modelType,
         modelName,
-        domainEvent
+        domainEvent: event,
+        domainEventMetadata: metadata
       });
 
-      const services = getServices({ app, readModel, modelStore, modelType, modelName });
+      const services = getServices({
+        app,
+        metadata,
+        readModel,
+        modelStore,
+        modelType,
+        modelName
+      });
 
       try {
-        await eventListener(readModelAggregate, domainEvent, services);
+        await eventListener(readModelAggregate, event, services);
       } catch (ex) {
         this.logger.debug('Failed to handle event.', { err: ex });
 

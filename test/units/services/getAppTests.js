@@ -5,8 +5,8 @@ const path = require('path');
 const applicationManager = require('wolkenkit-application'),
       assert = require('assertthat');
 
-const getApp = require('../../../../EventHandler/services/getApp'),
-      ModelStore = require('../../../../modelStore/ModelStore');
+const getApp = require('../../../services/getApp'),
+      ModelStore = require('../../../modelStore/ModelStore');
 
 const modelStore = new ModelStore();
 
@@ -15,7 +15,7 @@ suite('getApp', () => {
 
   suiteSetup(async () => {
     readModel = (await applicationManager.load({
-      directory: path.join(__dirname, '..', '..', '..', '..', 'app')
+      directory: path.join(__dirname, '..', '..', '..', 'app')
     })).readModel;
   });
 

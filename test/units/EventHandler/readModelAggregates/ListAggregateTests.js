@@ -19,13 +19,27 @@ const readModel = {
 };
 
 suite('ListAggregate', () => {
-  let domainEvent;
+  let domainEvent,
+      domainEventMetadata,
+      tokens,
+      users;
 
   setup(() => {
+    tokens = {
+      jane: { sub: uuid() }
+    };
+    users = {
+      jane: { id: tokens.jane.sub, token: tokens.jane }
+    };
+
     domainEvent = buildEvent('planning', 'peerGroup', uuid(), 'started', {
       initiator: 'Jane Doe',
       destination: 'Riva'
     });
+
+    domainEvent.addInitiator(users.jane);
+
+    domainEventMetadata = { state: {}, previousState: {}};
   });
 
   test('is an object.', async () => {
@@ -217,10 +231,18 @@ suite('ListAggregate', () => {
       }).is.throwing('Domain event is missing.');
     });
 
-    test('throws an error if uncommitted events are missing.', async () => {
+    test('throws an error if domain event metadata are missing.', async () => {
       assert.that(() => {
         /* eslint-disable no-new */
         new ListAggregate.Writable({ readModel: {}, modelStore: {}, modelName: 'foo', domainEvent: {}});
+        /* eslint-enable no-new */
+      }).is.throwing('Domain event metadata are missing.');
+    });
+
+    test('throws an error if uncommitted events are missing.', async () => {
+      assert.that(() => {
+        /* eslint-disable no-new */
+        new ListAggregate.Writable({ readModel: {}, modelStore: {}, modelName: 'foo', domainEvent: {}, domainEventMetadata: {}});
         /* eslint-enable no-new */
       }).is.throwing('Uncommitted events are missing.');
     });
@@ -232,6 +254,7 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -247,20 +270,21 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
         listAggregate.add({ id, initiator: 'Jane Doe', destination: 'Riva', participants: []});
 
         assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-        assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-        assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('added');
-        assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.id).is.equalTo(id);
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.initiator).is.equalTo('Jane Doe');
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.destination).is.equalTo('Riva');
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.participants).is.equalTo([]);
+        assert.that(listAggregate.uncommittedEvents[0].event.context.name).is.equalTo('lists');
+        assert.that(listAggregate.uncommittedEvents[0].event.aggregate.name).is.equalTo('peerGroups');
+        assert.that(listAggregate.uncommittedEvents[0].event.name).is.equalTo('added');
+        assert.that(listAggregate.uncommittedEvents[0].event.type).is.equalTo('readModel');
+        assert.that(listAggregate.uncommittedEvents[0].event.data.payload.id).is.equalTo(id);
+        assert.that(listAggregate.uncommittedEvents[0].event.data.payload.initiator).is.equalTo('Jane Doe');
+        assert.that(listAggregate.uncommittedEvents[0].event.data.payload.destination).is.equalTo('Riva');
+        assert.that(listAggregate.uncommittedEvents[0].event.data.payload.participants).is.equalTo([]);
       });
 
       test('adds multiple added events to the list of uncommitted events.', async () => {
@@ -270,6 +294,7 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -277,74 +302,31 @@ suite('ListAggregate', () => {
         listAggregate.add({ id, initiator: 'John Doe', destination: 'Sultan Saray', participants: []});
 
         assert.that(listAggregate.uncommittedEvents.length).is.equalTo(2);
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.id).is.equalTo(id);
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.initiator).is.equalTo('Jane Doe');
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.destination).is.equalTo('Riva');
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.participants).is.equalTo([]);
+        assert.that(listAggregate.uncommittedEvents[0].event.data.payload.id).is.equalTo(id);
+        assert.that(listAggregate.uncommittedEvents[0].event.data.payload.initiator).is.equalTo('Jane Doe');
+        assert.that(listAggregate.uncommittedEvents[0].event.data.payload.destination).is.equalTo('Riva');
+        assert.that(listAggregate.uncommittedEvents[0].event.data.payload.participants).is.equalTo([]);
 
-        assert.that(listAggregate.uncommittedEvents[1].data.payload.id).is.equalTo(id);
-        assert.that(listAggregate.uncommittedEvents[1].data.payload.initiator).is.equalTo('John Doe');
-        assert.that(listAggregate.uncommittedEvents[1].data.payload.destination).is.equalTo('Sultan Saray');
-        assert.that(listAggregate.uncommittedEvents[1].data.payload.participants).is.equalTo([]);
+        assert.that(listAggregate.uncommittedEvents[1].event.data.payload.id).is.equalTo(id);
+        assert.that(listAggregate.uncommittedEvents[1].event.data.payload.initiator).is.equalTo('John Doe');
+        assert.that(listAggregate.uncommittedEvents[1].event.data.payload.destination).is.equalTo('Sultan Saray');
+        assert.that(listAggregate.uncommittedEvents[1].event.data.payload.participants).is.equalTo([]);
       });
 
-      test('applies the domain event authorization information to the model event.', async () => {
+      test('applies the domain event initiator to the model event.', async () => {
         const listAggregate = new ListAggregate.Writable({
           readModel,
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
         listAggregate.add({ id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []});
 
         assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].metadata.isAuthorized).is.equalTo(domainEvent.metadata.isAuthorized);
-      });
-
-      test('merges the domain event authorization with the custom authorization information.', async () => {
-        const otherUserId = uuid();
-
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.add({
-          id: uuid(),
-          initiator: 'Jane Doe',
-          destination: 'Riva',
-          participants: [],
-          isAuthorized: {
-            owner: otherUserId
-          }
-        });
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].metadata.isAuthorized).is.equalTo({
-          ...domainEvent.metadata.isAuthorized,
-          owner: otherUserId
-        });
-      });
-
-      test('extends the payload using the domain event authorization information.', async () => {
-        const id = uuid();
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.add({ id, initiator: 'Jane Doe' });
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.isAuthorized).is.equalTo(domainEvent.metadata.isAuthorized);
+        assert.that(listAggregate.uncommittedEvents[0].event.initiator.id).is.equalTo(users.jane.id);
       });
 
       test('adds an automatically created id if is is missing.', async () => {
@@ -353,47 +335,14 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
         listAggregate.add({ initiator: 'Jane Doe' });
 
         assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.id).is.equalTo(domainEvent.aggregate.id);
-      });
-
-      test('adds authorization information and owner.', async () => {
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.add({ initiator: 'Jane Doe' });
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.isAuthorized.owner).is.equalTo(domainEvent.metadata.isAuthorized.owner);
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.isAuthorized.forAuthenticated).is.false();
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.isAuthorized.forPublic).is.true();
-      });
-
-      test('merges authorization information and keeps the owner.', async () => {
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.add({ initiator: 'Jane Doe', isAuthorized: { forAuthenticated: true }});
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.isAuthorized.owner).is.equalTo(domainEvent.metadata.isAuthorized.owner);
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.isAuthorized.forAuthenticated).is.true();
-        assert.that(listAggregate.uncommittedEvents[0].data.payload.isAuthorized.forPublic).is.true();
+        assert.that(listAggregate.uncommittedEvents[0].event.data.payload.id).is.equalTo(domainEvent.aggregate.id);
       });
 
       suite('orUpdate', () => {
@@ -404,6 +353,7 @@ suite('ListAggregate', () => {
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -420,6 +370,7 @@ suite('ListAggregate', () => {
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -437,6 +388,7 @@ suite('ListAggregate', () => {
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -456,6 +408,7 @@ suite('ListAggregate', () => {
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -476,6 +429,7 @@ suite('ListAggregate', () => {
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -487,15 +441,15 @@ suite('ListAggregate', () => {
             });
 
           assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-          assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-          assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-          assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('upserted');
-          assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-          assert.that(listAggregate.uncommittedEvents[0].data.selector).is.equalTo({
+          assert.that(listAggregate.uncommittedEvents[0].event.context.name).is.equalTo('lists');
+          assert.that(listAggregate.uncommittedEvents[0].event.aggregate.name).is.equalTo('peerGroups');
+          assert.that(listAggregate.uncommittedEvents[0].event.name).is.equalTo('upserted');
+          assert.that(listAggregate.uncommittedEvents[0].event.type).is.equalTo('readModel');
+          assert.that(listAggregate.uncommittedEvents[0].event.data.selector).is.equalTo({
             initiator: 'Jane Doe'
           });
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.add).is.ofType('object');
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.update).is.equalTo({
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.add).is.ofType('object');
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.update).is.equalTo({
             destination: 'Riva'
           });
         });
@@ -508,6 +462,7 @@ suite('ListAggregate', () => {
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -526,31 +481,32 @@ suite('ListAggregate', () => {
             });
 
           assert.that(listAggregate.uncommittedEvents.length).is.equalTo(2);
-          assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('upserted');
-          assert.that(listAggregate.uncommittedEvents[0].data.selector).is.equalTo({
+          assert.that(listAggregate.uncommittedEvents[0].event.name).is.equalTo('upserted');
+          assert.that(listAggregate.uncommittedEvents[0].event.data.selector).is.equalTo({
             initiator: 'Jane Doe'
           });
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.add).is.ofType('object');
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.update).is.equalTo({
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.add).is.ofType('object');
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.update).is.equalTo({
             destination: 'Riva'
           });
-          assert.that(listAggregate.uncommittedEvents[1].name).is.equalTo('upserted');
-          assert.that(listAggregate.uncommittedEvents[1].data.selector).is.equalTo({
+          assert.that(listAggregate.uncommittedEvents[1].event.name).is.equalTo('upserted');
+          assert.that(listAggregate.uncommittedEvents[1].event.data.selector).is.equalTo({
             initiator: 'Jane Doe'
           });
-          assert.that(listAggregate.uncommittedEvents[1].data.payload.add).is.ofType('object');
-          assert.that(listAggregate.uncommittedEvents[1].data.payload.update).is.equalTo({
+          assert.that(listAggregate.uncommittedEvents[1].event.data.payload.add).is.ofType('object');
+          assert.that(listAggregate.uncommittedEvents[1].event.data.payload.update).is.equalTo({
             destination: 'Sultan Saray'
           });
         });
 
-        test('applies the domain event authorization information to the model event.', async () => {
+        test('applies the domain event initiator to the model event.', async () => {
           const id = uuid();
           const listAggregate = new ListAggregate.Writable({
             readModel,
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -562,11 +518,7 @@ suite('ListAggregate', () => {
             });
 
           assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-          assert.that(listAggregate.uncommittedEvents[0].metadata.isAuthorized).is.equalTo({
-            owner: domainEvent.metadata.isAuthorized.owner,
-            forAuthenticated: false,
-            forPublic: true
-          });
+          assert.that(listAggregate.uncommittedEvents[0].event.initiator.id).is.equalTo(users.jane.id);
         });
       });
 
@@ -578,6 +530,7 @@ suite('ListAggregate', () => {
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -594,6 +547,7 @@ suite('ListAggregate', () => {
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -602,14 +556,14 @@ suite('ListAggregate', () => {
             orDiscard();
 
           assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-          assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-          assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-          assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('ensured');
-          assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.id).is.equalTo(id);
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.initiator).is.equalTo('Jane Doe');
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.destination).is.equalTo('Riva');
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.participants).is.equalTo([]);
+          assert.that(listAggregate.uncommittedEvents[0].event.context.name).is.equalTo('lists');
+          assert.that(listAggregate.uncommittedEvents[0].event.aggregate.name).is.equalTo('peerGroups');
+          assert.that(listAggregate.uncommittedEvents[0].event.name).is.equalTo('ensured');
+          assert.that(listAggregate.uncommittedEvents[0].event.type).is.equalTo('readModel');
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.id).is.equalTo(id);
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.initiator).is.equalTo('Jane Doe');
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.destination).is.equalTo('Riva');
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.participants).is.equalTo([]);
         });
 
         test('adds multiple ensured events to the list of uncommitted events.', async () => {
@@ -620,6 +574,7 @@ suite('ListAggregate', () => {
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -632,25 +587,26 @@ suite('ListAggregate', () => {
             orDiscard();
 
           assert.that(listAggregate.uncommittedEvents.length).is.equalTo(2);
-          assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('ensured');
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.id).is.equalTo(id1);
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.initiator).is.equalTo('Jane Doe');
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.destination).is.equalTo('Riva');
-          assert.that(listAggregate.uncommittedEvents[0].data.payload.participants).is.equalTo([]);
-          assert.that(listAggregate.uncommittedEvents[1].name).is.equalTo('ensured');
-          assert.that(listAggregate.uncommittedEvents[1].data.payload.id).is.equalTo(id2);
-          assert.that(listAggregate.uncommittedEvents[1].data.payload.initiator).is.equalTo('Jane Doe');
-          assert.that(listAggregate.uncommittedEvents[1].data.payload.destination).is.equalTo('Sultan Saray');
-          assert.that(listAggregate.uncommittedEvents[1].data.payload.participants).is.equalTo([]);
+          assert.that(listAggregate.uncommittedEvents[0].event.name).is.equalTo('ensured');
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.id).is.equalTo(id1);
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.initiator).is.equalTo('Jane Doe');
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.destination).is.equalTo('Riva');
+          assert.that(listAggregate.uncommittedEvents[0].event.data.payload.participants).is.equalTo([]);
+          assert.that(listAggregate.uncommittedEvents[1].event.name).is.equalTo('ensured');
+          assert.that(listAggregate.uncommittedEvents[1].event.data.payload.id).is.equalTo(id2);
+          assert.that(listAggregate.uncommittedEvents[1].event.data.payload.initiator).is.equalTo('Jane Doe');
+          assert.that(listAggregate.uncommittedEvents[1].event.data.payload.destination).is.equalTo('Sultan Saray');
+          assert.that(listAggregate.uncommittedEvents[1].event.data.payload.participants).is.equalTo([]);
         });
 
-        test('applies the domain event authorization information to the model event.', async () => {
+        test('applies the domain event initiator to the model event.', async () => {
           const id = uuid();
           const listAggregate = new ListAggregate.Writable({
             readModel,
             modelStore: {},
             modelName: 'peerGroups',
             domainEvent,
+            domainEventMetadata,
             uncommittedEvents: []
           });
 
@@ -659,11 +615,7 @@ suite('ListAggregate', () => {
             orDiscard();
 
           assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-          assert.that(listAggregate.uncommittedEvents[0].metadata.isAuthorized).is.equalTo({
-            owner: domainEvent.metadata.isAuthorized.owner,
-            forAuthenticated: false,
-            forPublic: true
-          });
+          assert.that(listAggregate.uncommittedEvents[0].event.initiator.id).is.equalTo(users.jane.id);
         });
       });
     });
@@ -675,6 +627,7 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -689,6 +642,7 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -705,6 +659,7 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -722,6 +677,7 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -731,11 +687,11 @@ suite('ListAggregate', () => {
         });
 
         assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-        assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-        assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('updated');
-        assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
+        assert.that(listAggregate.uncommittedEvents[0].event.context.name).is.equalTo('lists');
+        assert.that(listAggregate.uncommittedEvents[0].event.aggregate.name).is.equalTo('peerGroups');
+        assert.that(listAggregate.uncommittedEvents[0].event.name).is.equalTo('updated');
+        assert.that(listAggregate.uncommittedEvents[0].event.type).is.equalTo('readModel');
+        assert.that(listAggregate.uncommittedEvents[0].event.data).is.equalTo({
           selector: { initiator: 'Jane Doe' },
           payload: { destination: 'Riva' }
         });
@@ -747,6 +703,7 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -760,22 +717,23 @@ suite('ListAggregate', () => {
         });
 
         assert.that(listAggregate.uncommittedEvents.length).is.equalTo(2);
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
+        assert.that(listAggregate.uncommittedEvents[0].event.data).is.equalTo({
           selector: { initiator: 'Jane Doe' },
           payload: { destination: 'Riva' }
         });
-        assert.that(listAggregate.uncommittedEvents[1].data).is.equalTo({
+        assert.that(listAggregate.uncommittedEvents[1].event.data).is.equalTo({
           selector: { initiator: 'Jane Doe' },
           payload: { destination: 'Sultan Saray' }
         });
       });
 
-      test('applies the domain event authorization information to the model event.', async () => {
+      test('applies the domain event initiator to the model event.', async () => {
         const listAggregate = new ListAggregate.Writable({
           readModel,
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -785,320 +743,7 @@ suite('ListAggregate', () => {
         });
 
         assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].metadata.isAuthorized).is.equalTo({
-          owner: domainEvent.metadata.isAuthorized.owner,
-          forAuthenticated: false,
-          forPublic: true
-        });
-      });
-    });
-
-    suite('authorize', () => {
-      test('throws an error if where is missing.', async () => {
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        assert.that(() => {
-          listAggregate.authorize({});
-        }).is.throwing('Where is missing.');
-      });
-
-      test('throws an error if no authorization options are given.', async () => {
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        assert.that(() => {
-          listAggregate.authorize({
-            where: { id: uuid() }
-          });
-        }).is.throwing('Invalid authorization options.');
-      });
-
-      test('throws an error if forAuthenticated is not a boolean.', async () => {
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        assert.that(() => {
-          listAggregate.authorize({
-            where: { id: uuid() },
-            forAuthenticated: 'true'
-          });
-        }).is.throwing('Invalid authorization options.');
-      });
-
-      test('adds an updated event to the list of uncommitted events when forAuthenticated is false.', async () => {
-        const aggregateIdToUpdate = uuid();
-
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.authorize({
-          where: { id: aggregateIdToUpdate },
-          forAuthenticated: false
-        });
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-        assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-        assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('updated');
-        assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
-          selector: { id: aggregateIdToUpdate },
-          payload: {
-            isAuthorized: { forAuthenticated: false }
-          }
-        });
-      });
-
-      test('adds an updated event to the list of uncommitted events when forAuthenticated is true.', async () => {
-        const aggregateIdToUpdate = uuid();
-
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.authorize({
-          where: { id: aggregateIdToUpdate },
-          forAuthenticated: true
-        });
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-        assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-        assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('updated');
-        assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
-          selector: { id: aggregateIdToUpdate },
-          payload: {
-            isAuthorized: { forAuthenticated: true }
-          }
-        });
-      });
-
-      test('throws an error if forPublic is not a boolean.', async () => {
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        assert.that(() => {
-          listAggregate.authorize({
-            where: { id: uuid() },
-            forPublic: 'true'
-          });
-        }).is.throwing('Invalid authorization options.');
-      });
-
-      test('adds an updated event to the list of uncommitted events when forPublic is false.', async () => {
-        const aggregateIdToUpdate = uuid();
-
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.authorize({
-          where: { id: aggregateIdToUpdate },
-          forPublic: false
-        });
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-        assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-        assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('updated');
-        assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
-          selector: { id: aggregateIdToUpdate },
-          payload: {
-            isAuthorized: { forPublic: false }
-          }
-        });
-      });
-
-      test('adds an updated event to the list of uncommitted events when forPublic is true.', async () => {
-        const aggregateIdToUpdate = uuid();
-
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.authorize({
-          where: { id: aggregateIdToUpdate },
-          forPublic: true
-        });
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-        assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-        assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('updated');
-        assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
-          selector: { id: aggregateIdToUpdate },
-          payload: {
-            isAuthorized: { forPublic: true }
-          }
-        });
-      });
-
-      test('does not set other any other properties.', async () => {
-        const aggregateIdToUpdate = uuid();
-
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.authorize({
-          where: { id: aggregateIdToUpdate },
-          forAuthenticated: false,
-          forPublic: true,
-          foo: 'bar'
-        });
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-        assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-        assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('updated');
-        assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
-          selector: { id: aggregateIdToUpdate },
-          payload: {
-            isAuthorized: {
-              forAuthenticated: false,
-              forPublic: true
-            }
-          }
-        });
-      });
-    });
-
-    suite('transferOwnership', () => {
-      test('throws an error if where is missing.', async () => {
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        assert.that(() => {
-          listAggregate.transferOwnership({});
-        }).is.throwing('Where is missing.');
-      });
-
-      test('throws an error if no new owner is given.', async () => {
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        assert.that(() => {
-          listAggregate.transferOwnership({
-            where: { id: uuid() }
-          });
-        }).is.throwing('Owner is missing.');
-      });
-
-      test('adds an updated event to the list of uncommitted events when owner is given.', async () => {
-        const aggregateIdToUpdate = uuid(),
-              newOwnerId = uuid();
-
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.transferOwnership({
-          where: { id: aggregateIdToUpdate },
-          to: newOwnerId
-        });
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-        assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-        assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('updated');
-        assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
-          selector: { id: aggregateIdToUpdate },
-          payload: {
-            isAuthorized: { owner: newOwnerId }
-          }
-        });
-      });
-
-      test('does not set other any other properties.', async () => {
-        const aggregateIdToUpdate = uuid(),
-              newOwnerId = uuid();
-
-        const listAggregate = new ListAggregate.Writable({
-          readModel,
-          modelStore: {},
-          modelName: 'peerGroups',
-          domainEvent,
-          uncommittedEvents: []
-        });
-
-        listAggregate.transferOwnership({
-          where: { id: aggregateIdToUpdate },
-          to: newOwnerId,
-          foo: 'bar'
-        });
-
-        assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-        assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-        assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('updated');
-        assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
-          selector: { id: aggregateIdToUpdate },
-          payload: {
-            isAuthorized: { owner: newOwnerId }
-          }
-        });
+        assert.that(listAggregate.uncommittedEvents[0].event.initiator.id).is.equalTo(users.jane.id);
       });
     });
 
@@ -1109,6 +754,7 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -1123,6 +769,7 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -1131,11 +778,11 @@ suite('ListAggregate', () => {
         });
 
         assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].context.name).is.equalTo('lists');
-        assert.that(listAggregate.uncommittedEvents[0].aggregate.name).is.equalTo('peerGroups');
-        assert.that(listAggregate.uncommittedEvents[0].name).is.equalTo('removed');
-        assert.that(listAggregate.uncommittedEvents[0].type).is.equalTo('readModel');
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
+        assert.that(listAggregate.uncommittedEvents[0].event.context.name).is.equalTo('lists');
+        assert.that(listAggregate.uncommittedEvents[0].event.aggregate.name).is.equalTo('peerGroups');
+        assert.that(listAggregate.uncommittedEvents[0].event.name).is.equalTo('removed');
+        assert.that(listAggregate.uncommittedEvents[0].event.type).is.equalTo('readModel');
+        assert.that(listAggregate.uncommittedEvents[0].event.data).is.equalTo({
           selector: { initiator: 'Jane Doe' }
         });
       });
@@ -1146,6 +793,7 @@ suite('ListAggregate', () => {
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -1157,28 +805,21 @@ suite('ListAggregate', () => {
         });
 
         assert.that(listAggregate.uncommittedEvents.length).is.equalTo(2);
-        assert.that(listAggregate.uncommittedEvents[0].data).is.equalTo({
+        assert.that(listAggregate.uncommittedEvents[0].event.data).is.equalTo({
           selector: { initiator: 'Jane Doe' }
         });
-        assert.that(listAggregate.uncommittedEvents[1].data).is.equalTo({
+        assert.that(listAggregate.uncommittedEvents[1].event.data).is.equalTo({
           selector: { initiator: 'Jane Doe' }
         });
       });
 
-      test('applies the domain event authorization information to the model event.', async () => {
-        const ownerId = uuid();
-
-        domainEvent.metadata.isAuthorized = {
-          owner: ownerId,
-          forAuthenticated: true,
-          forPublic: false
-        };
-
+      test('applies the domain event initiator to the model event.', async () => {
         const listAggregate = new ListAggregate.Writable({
           readModel,
           modelStore: {},
           modelName: 'peerGroups',
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
 
@@ -1187,11 +828,7 @@ suite('ListAggregate', () => {
         });
 
         assert.that(listAggregate.uncommittedEvents.length).is.equalTo(1);
-        assert.that(listAggregate.uncommittedEvents[0].metadata.isAuthorized).is.equalTo({
-          owner: ownerId,
-          forAuthenticated: true,
-          forPublic: false
-        });
+        assert.that(listAggregate.uncommittedEvents[0].event.initiator.id).is.equalTo(users.jane.id);
       });
     });
   });

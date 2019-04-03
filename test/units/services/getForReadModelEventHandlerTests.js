@@ -6,15 +6,15 @@ const applicationManager = require('wolkenkit-application'),
       assert = require('assertthat'),
       tailwind = require('tailwind');
 
-const getServices = require('../../../../EventHandler/services/get'),
-      ModelStore = require('../../../../modelStore/ModelStore');
+const getServices = require('../../../services/getForReadModelEventHandler'),
+      ModelStore = require('../../../modelStore/ModelStore');
 
 const app = tailwind.createApp({
-  keys: path.join(__dirname, '..', '..', '..', 'shared', 'keys'),
+  keys: path.join(__dirname, '..', '..', 'shared', 'keys'),
   identityProviders: [
     {
       issuer: 'https://auth.thenativeweb.io',
-      certificate: path.join(__dirname, '..', '..', '..', 'shared', 'keys', 'certificate.pem')
+      certificate: path.join(__dirname, '..', '..', 'shared', 'keys', 'certificate.pem')
     }
   ]
 });
@@ -23,12 +23,12 @@ const modelStore = new ModelStore();
 const modelType = 'lists';
 const modelName = 'peerGroups';
 
-suite('getServices', () => {
+suite('getForReadModelEventHandler', () => {
   let readModel;
 
   suiteSetup(async () => {
     readModel = (await applicationManager.load({
-      directory: path.join(__dirname, '..', '..', '..', '..', 'app')
+      directory: path.join(__dirname, '..', '..', '..', 'app')
     })).readModel;
   });
 

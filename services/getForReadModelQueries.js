@@ -1,11 +1,24 @@
 'use strict';
 
+const path = require('path');
+
 const getApp = require('./getApp'),
+      getClient = require('./getClient'),
       getLogger = require('./getLogger');
 
-const get = function ({ app, readModel, modelStore, modelType, modelName }) {
+const getForReadModelQueries = function ({
+  app,
+  metadata,
+  readModel,
+  modelStore,
+  modelType,
+  modelName
+}) {
   if (!app) {
     throw new Error('App is missing.');
+  }
+  if (!metadata) {
+    throw new Error('Metadata are missing.');
   }
   if (!readModel) {
     throw new Error('Read model is missing.');
@@ -22,10 +35,14 @@ const get = function ({ app, readModel, modelStore, modelType, modelName }) {
 
   const services = {
     app: getApp({ readModel, modelStore }),
-    logger: getLogger({ app, modelType, modelName })
+    client: getClient({ metadata }),
+    logger: getLogger({
+      app,
+      fileName: path.join('readModel', modelType, `${modelName}.js`)
+    })
   };
 
   return services;
 };
 
-module.exports = get;
+module.exports = getForReadModelQueries;

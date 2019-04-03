@@ -4,12 +4,14 @@ const path = require('path'),
       util = require('util');
 
 const assert = require('assertthat'),
-      EventStore = require('wolkenkit-eventstore/dist/postgres/Eventstore'),
+      EventStore = require('wolkenkit-eventstore/lib/postgres/Eventstore'),
       hase = require('hase'),
       jsonLinesClient = require('json-lines-client'),
+      noop = require('lodash/noop'),
       request = require('superagent'),
       runfork = require('runfork'),
       shell = require('shelljs'),
+      toArray = require('streamtoarray'),
       uuid = require('uuidv4');
 
 const buildCommand = require('../shared/buildCommand'),
@@ -22,7 +24,7 @@ const buildCommand = require('../shared/buildCommand'),
 
 const sleep = util.promisify(setTimeout);
 
-const isDebugMode = false;
+const isDebugMode = true;
 
 const api = {};
 
@@ -34,7 +36,11 @@ api.sendCommand = async function (command) {
   return res;
 };
 
-api.subscribeToEvents = async function (options) {
+api.subscribeToEvents = async function ({
+  onConnect = noop,
+  onData,
+  onError = noop
+}) {
   const server = await jsonLinesClient({
     protocol: 'http',
     host: 'localhost',
@@ -43,34 +49,28 @@ api.subscribeToEvents = async function (options) {
     body: {}
   });
 
-  let onData,
-      onError;
+  process.nextTick(async () => await onConnect());
 
-  const unsubscribe = async function () {
-    server.stream.removeListener('error', onError);
-    server.stream.removeListener('data', onData);
-    server.disconnect();
+  let keepReceivingEvents = true;
 
-    await sleep(0.5 * 1000);
-  };
+  try {
+    for await (const data of server.stream) {
+      /* eslint-disable no-loop-func */
+      await onData(data, () => {
+        keepReceivingEvents = false;
+      });
+      /* eslint-enable no-loop-func */
 
-  onData = async function (data) {
-    await options.onData(data, unsubscribe);
-  };
-
-  onError = async function (err) {
-    await unsubscribe();
-
-    if (options.onError) {
-      await options.onError(err);
+      if (!keepReceivingEvents) {
+        server.disconnect();
+        break;
+      }
     }
-  };
-
-  server.stream.on('data', onData);
-  server.stream.on('error', onError);
-
-  if (options.onConnect) {
-    await options.onConnect();
+  } catch (ex) {
+    server.disconnect();
+    await onError(ex);
+  } finally {
+    await sleep(0.5 * 1000);
   }
 };
 
@@ -97,40 +97,10 @@ api.readModel = async function (options) {
     headers: options.headers || {}
   });
 
-  const result = await new Promise(async (resolve, reject) => {
-    let onData,
-        onEnd,
-        onError;
+  const result = await toArray(server.stream);
 
-    const records = [];
-
-    const unsubscribe = async function () {
-      server.stream.removeListener('data', onData);
-      server.stream.removeListener('end', onEnd);
-      server.stream.removeListener('error', onError);
-      server.disconnect();
-
-      await sleep(0.5 * 1000);
-    };
-
-    onData = function (data) {
-      records.push(data);
-    };
-
-    onEnd = async function () {
-      await unsubscribe();
-      resolve(records);
-    };
-
-    onError = async function (err) {
-      await unsubscribe();
-      reject(err);
-    };
-
-    server.stream.on('data', onData);
-    server.stream.on('end', onEnd);
-    server.stream.on('error', onError);
-  });
+  server.disconnect();
+  await sleep(0.5 * 1000);
 
   return result;
 };
@@ -145,7 +115,9 @@ suite('integrationTests', function () {
       eventbus,
       eventStore,
       mq,
-      stopApp;
+      stopApp,
+      tokens,
+      users;
 
   setup(async () => {
     const app = path.join(__dirname, '..', '..', 'app.js');
@@ -208,6 +180,15 @@ suite('integrationTests', function () {
       silent: !isDebugMode
     });
 
+    tokens = {
+      jane: { sub: uuid() },
+      public: { sub: 'anonymous' }
+    };
+    users = {
+      jane: { id: tokens.jane.sub, token: tokens.jane },
+      public: { id: tokens.public.sub, token: tokens.public }
+    };
+
     await sleep(2 * 1000);
   });
 
@@ -224,55 +205,6 @@ suite('integrationTests', function () {
     await stopApp();
   });
 
-  suite('infrastructure recovery', () => {
-    test('exits when the connection to the command bus / event bus is lost.', async function () {
-      this.timeout(25 * 1000);
-
-      shell.exec('docker kill rabbitmq-integration');
-
-      await sleep(1 * 1000);
-
-      await assert.that(async () => {
-        await request.get('http://localhost:3000/v1/ping');
-      }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
-
-      shell.exec('docker start rabbitmq-integration');
-      await waitForRabbitMq({ url: env.RABBITMQ_URL_INTEGRATION });
-    });
-
-    test('exits when the connection to the event store is lost.', async () => {
-      shell.exec('docker kill postgres-integration');
-
-      await sleep(1 * 1000);
-
-      await assert.that(async () => {
-        await request.get('http://localhost:3000/v1/ping');
-      }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
-
-      shell.exec('docker start postgres-integration');
-      await waitForPostgres({ url: env.POSTGRES_URL_INTEGRATION });
-
-      // We need to wait for a few seconds after having started
-      // PostgreSQL, as it (for whatever reason) takes a long time
-      // to actually become available. If we don't do a sleep here,
-      // we run into "the database system is starting up" errors.
-      await sleep(5 * 1000);
-    });
-
-    test('exits when the connection to a list store is lost.', async () => {
-      shell.exec('docker kill mongodb-integration');
-
-      await sleep(1 * 1000);
-
-      await assert.that(async () => {
-        await request.get('http://localhost:3000/v1/ping');
-      }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
-
-      shell.exec('docker start mongodb-integration');
-      await waitForMongo({ url: env.MONGO_URL_INTEGRATION });
-    });
-  });
-
   suite('commands', () => {
     test('passes a command from API to commandbus.', async () => {
       const command = buildCommand('planning', 'peerGroup', 'start', {
@@ -284,9 +216,18 @@ suite('integrationTests', function () {
         try {
           commandbus.once('data', message => {
             try {
-              const receivedCommand = message.payload;
+              const receivedCommand = message.payload.command,
+                    receivedMetadata = message.payload.metadata;
 
               assert.that(receivedCommand.name).is.equalTo('start');
+              assert.that(receivedMetadata).is.atLeast({
+                client: {
+                  user: {
+                    id: 'anonymous',
+                    token: { sub: 'anonymous' }
+                  }
+                }
+              });
               message.next();
             } catch (ex) {
               return reject(ex);
@@ -311,19 +252,17 @@ suite('integrationTests', function () {
         destination: 'Somewhere over the rainbow'
       });
 
+      event.addInitiator(users.jane);
+
       await new Promise(async (resolve, reject) => {
         try {
           await api.subscribeToEvents({
             async onConnect () {
-              eventbus.write(event);
+              eventbus.write({ event, metadata: { state: {}, previousState: {}}});
             },
             async onData (receivedEvent, unsubscribe) {
-              try {
-                await unsubscribe();
-                assert.that(receivedEvent.name).is.equalTo('started');
-              } catch (ex) {
-                return reject(ex);
-              }
+              unsubscribe();
+              assert.that(receivedEvent.name).is.equalTo('started');
               resolve();
             },
             async onError (err) {
@@ -342,13 +281,15 @@ suite('integrationTests', function () {
         destination: 'Somewhere over the rainbow'
       });
 
+      event.addInitiator(users.jane);
+
       let counter = 0;
 
       await new Promise(async (resolve, reject) => {
         try {
           await api.subscribeToEvents({
             async onConnect () {
-              eventbus.write(event);
+              eventbus.write({ event, metadata: { state: {}, previousState: {}}});
             },
             async onData (receivedEvent, unsubscribe) {
               try {
@@ -365,6 +306,11 @@ suite('integrationTests', function () {
                     break;
                   }
                   case 3: {
+                    assert.that(receivedEvent.type).is.equalTo('readModel');
+                    assert.that(receivedEvent.aggregate.name).is.equalTo('peerGroupsForAuthenticated');
+                    break;
+                  }
+                  case 4: {
                     assert.that(receivedEvent.type).is.equalTo('readModel');
                     assert.that(receivedEvent.aggregate.name).is.equalTo('tasteMakers');
                     await unsubscribe();
@@ -394,13 +340,18 @@ suite('integrationTests', function () {
         reason: 'Something went wrong...'
       });
 
+      eventStartRejected.addInitiator(users.public);
+
       Reflect.deleteProperty(eventStartRejected.metadata, 'position');
 
       await new Promise(async (resolve, reject) => {
         try {
           await api.subscribeToEvents({
             async onConnect () {
-              eventbus.write(eventStartRejected);
+              eventbus.write({
+                event: eventStartRejected,
+                metadata: { state: {}, previousState: {}}
+              });
             },
             async onData (receivedEvent, unsubscribe) {
               try {
@@ -426,13 +377,18 @@ suite('integrationTests', function () {
         reason: 'Something went wrong...'
       });
 
+      eventStartFailed.addInitiator(users.public);
+
       Reflect.deleteProperty(eventStartFailed.metadata, 'position');
 
       await new Promise(async (resolve, reject) => {
         try {
           await api.subscribeToEvents({
             async onConnect () {
-              eventbus.write(eventStartFailed);
+              eventbus.write({
+                event: eventStartFailed,
+                metadata: { state: {}, previousState: {}}
+              });
             },
             async onData (receivedEvent, unsubscribe) {
               try {
@@ -454,14 +410,21 @@ suite('integrationTests', function () {
     });
 
     test('skips events that had already been processed.', async () => {
-      const eventStarted = buildEvent('planning', 'peerGroup', 'started', {
+      const aggregateId = uuid();
+
+      const eventStarted = buildEvent('planning', 'peerGroup', aggregateId, 'started', {
         initiator: 'John Doe',
         destination: 'Somewhere over the rainbow'
       });
-      const eventFinished = buildEvent('integration', 'test', 'finished');
+      const eventJoined = buildEvent('planning', 'peerGroup', aggregateId, 'joined', {
+        participant: 'Jane Doe'
+      });
 
       eventStarted.metadata.position = 1;
-      eventFinished.metadata.position = 2;
+      eventJoined.metadata.position = 2;
+
+      eventStarted.addInitiator(users.jane);
+      eventJoined.addInitiator(users.jane);
 
       await new Promise(async (resolve, reject) => {
         try {
@@ -469,9 +432,18 @@ suite('integrationTests', function () {
 
           await api.subscribeToEvents({
             async onConnect () {
-              eventbus.write(eventStarted);
-              eventbus.write(eventStarted);
-              eventbus.write(eventFinished);
+              eventbus.write({
+                event: eventStarted,
+                metadata: { state: {}, previousState: {}}
+              });
+              eventbus.write({
+                event: eventStarted,
+                metadata: { state: {}, previousState: {}}
+              });
+              eventbus.write({
+                event: eventJoined,
+                metadata: { state: {}, previousState: {}}
+              });
             },
             async onData (receivedEvent, unsubscribe) {
               try {
@@ -481,7 +453,7 @@ suite('integrationTests', function () {
 
                 counter += 1;
 
-                if (receivedEvent.name === 'finished') {
+                if (receivedEvent.name === 'joined') {
                   assert.that(counter).is.equalTo(2);
                   await unsubscribe();
                   resolve();
@@ -518,6 +490,10 @@ suite('integrationTests', function () {
       eventJoined1.metadata.revision = 2;
       eventJoined2.metadata.revision = 3;
 
+      eventStarted.addInitiator(users.jane);
+      eventJoined1.addInitiator(users.jane);
+      eventJoined2.addInitiator(users.jane);
+
       const savedEvents = await eventStore.saveEvents({
         uncommittedEvents: [
           { event: eventStarted, state: {}},
@@ -526,7 +502,7 @@ suite('integrationTests', function () {
         ]
       });
 
-      const lastPosition = savedEvents[2].metadata.position;
+      const lastPosition = savedEvents[2].event.metadata.position;
 
       eventJoined2.metadata.position = lastPosition;
 
@@ -534,7 +510,10 @@ suite('integrationTests', function () {
         try {
           await api.subscribeToEvents({
             async onConnect () {
-              eventbus.write(eventJoined2);
+              eventbus.write({
+                event: eventJoined2,
+                metadata: { state: {}, previousState: {}}
+              });
             },
             async onData (receivedEvent, unsubscribe) {
               try {
@@ -573,6 +552,10 @@ suite('integrationTests', function () {
       eventJoined1.metadata.revision = 2;
       eventJoined2.metadata.revision = 3;
 
+      eventStarted.addInitiator(users.jane);
+      eventJoined1.addInitiator(users.jane);
+      eventJoined2.addInitiator(users.jane);
+
       const savedEvents = await eventStore.saveEvents({
         uncommittedEvents: [
           { event: eventStarted, state: {}},
@@ -581,7 +564,7 @@ suite('integrationTests', function () {
         ]
       });
 
-      const lastPosition = savedEvents[2].metadata.position;
+      const lastPosition = savedEvents[2].event.metadata.position;
 
       eventJoined2.metadata.position = lastPosition;
 
@@ -589,7 +572,10 @@ suite('integrationTests', function () {
         try {
           api.subscribeToEvents({
             async onConnect () {
-              eventbus.write(eventJoined2);
+              eventbus.write({
+                event: eventJoined2,
+                metadata: { state: {}, previousState: {}}
+              });
             },
             async onData (receivedEvent, unsubscribe) {
               await unsubscribe();
@@ -637,6 +623,11 @@ suite('integrationTests', function () {
       eventJoined2.metadata.revision = 3;
       eventJoined3.metadata.revision = 4;
 
+      eventStarted.addInitiator(users.jane);
+      eventJoined1.addInitiator(users.jane);
+      eventJoined2.addInitiator(users.jane);
+      eventJoined3.addInitiator(users.jane);
+
       let savedEvents = await eventStore.saveEvents({
         uncommittedEvents: [
           { event: eventStarted, state: {}},
@@ -644,7 +635,7 @@ suite('integrationTests', function () {
         ]
       });
 
-      let lastPosition = savedEvents[1].metadata.position;
+      let lastPosition = savedEvents[1].event.metadata.position;
 
       eventJoined1.metadata.position = lastPosition;
 
@@ -652,7 +643,10 @@ suite('integrationTests', function () {
         try {
           await api.subscribeToEvents({
             async onConnect () {
-              eventbus.write(eventJoined1);
+              eventbus.write({
+                event: eventJoined1,
+                metadata: { state: {}, previousState: {}}
+              });
             },
             async onData (receivedEvent, unsubscribe) {
               try {
@@ -680,7 +674,7 @@ suite('integrationTests', function () {
         ]
       });
 
-      lastPosition = savedEvents[1].metadata.position;
+      lastPosition = savedEvents[1].event.metadata.position;
 
       eventJoined3.metadata.position = lastPosition;
 
@@ -688,7 +682,10 @@ suite('integrationTests', function () {
         try {
           await api.subscribeToEvents({
             async onConnect () {
-              eventbus.write(eventJoined3);
+              eventbus.write({
+                event: eventJoined3,
+                metadata: { state: {}, previousState: {}}
+              });
             },
             async onData (receivedEvent, unsubscribe) {
               try {
@@ -736,8 +733,17 @@ suite('integrationTests', function () {
         eventFirst.metadata.position = 1;
         eventSecond.metadata.position = 2;
 
-        eventbus.write(eventFirst);
-        eventbus.write(eventSecond);
+        eventFirst.addInitiator(users.jane);
+        eventSecond.addInitiator(users.jane);
+
+        eventbus.write({
+          event: eventFirst,
+          metadata: { state: {}, previousState: {}}
+        });
+        eventbus.write({
+          event: eventSecond,
+          metadata: { state: {}, previousState: {}}
+        });
 
         await sleep(0.1 * 1000);
       });
@@ -866,78 +872,51 @@ suite('integrationTests', function () {
     });
 
     suite('authorized reading', () => {
-      let eventForAuthenticated,
-          eventForOwner,
-          eventForPublic;
+      let started;
 
       setup(async () => {
-        eventForOwner = buildEvent('planning', 'peerGroup', 'started', {
+        started = buildEvent('planning', 'peerGroup', 'started', {
           initiator: 'Jane Doe',
           destination: 'Somewhere over the rainbow'
         });
-        eventForAuthenticated = buildEvent('planning', 'peerGroup', 'started', {
-          initiator: 'John Doe',
-          destination: 'Land of Oz'
-        });
-        eventForPublic = buildEvent('planning', 'peerGroup', 'started', {
-          initiator: 'Jenny Doe',
-          destination: 'Fantasia'
-        });
 
-        eventForOwner.metadata.isAuthorized.forAuthenticated = false;
-        eventForOwner.metadata.isAuthorized.forPublic = false;
-        eventForOwner.metadata.position = 1;
-        eventForAuthenticated.metadata.isAuthorized.forAuthenticated = true;
-        eventForAuthenticated.metadata.isAuthorized.forPublic = false;
-        eventForAuthenticated.metadata.position = 2;
-        eventForPublic.metadata.isAuthorized.forAuthenticated = true;
-        eventForPublic.metadata.isAuthorized.forPublic = true;
-        eventForPublic.metadata.position = 3;
+        started.metadata.position = 1;
 
-        eventbus.write(eventForOwner);
-        eventbus.write(eventForAuthenticated);
-        eventbus.write(eventForPublic);
+        started.addInitiator(users.jane);
+
+        eventbus.write({
+          event: started,
+          metadata: { state: {}, previousState: {}}
+        });
 
         await sleep(0.1 * 1000);
       });
 
-      test('reads items for public users.', async () => {
+      test('reads items if access is granted.', async () => {
         const model = await api.readModel({
           modelType: 'lists',
-          modelName: 'peerGroups'
+          modelName: 'peerGroupsForAuthenticated',
+          headers: {
+            authorization: `Bearer ${issueToken('jane.doe')}`
+          }
         });
 
         assert.that(model.length).is.equalTo(1);
-        assert.that(model[0].initiator).is.equalTo('Jenny Doe');
+        assert.that(model[0]).is.equalTo({
+          id: started.aggregate.id,
+          initiator: 'Jane Doe',
+          destination: 'Somewhere over the rainbow',
+          participants: []
+        });
       });
 
-      test('reads items for authenticated users.', async () => {
+      test('does not read items if access is denied.', async () => {
         const model = await api.readModel({
           modelType: 'lists',
-          modelName: 'peerGroups',
-          headers: {
-            authorization: `Bearer ${issueToken(uuid())}`
-          }
+          modelName: 'peerGroupsForAuthenticated'
         });
 
-        assert.that(model.length).is.equalTo(2);
-        assert.that(model[0].initiator).is.equalTo('John Doe');
-        assert.that(model[1].initiator).is.equalTo('Jenny Doe');
-      });
-
-      test('reads items for owners.', async () => {
-        const model = await api.readModel({
-          modelType: 'lists',
-          modelName: 'peerGroups',
-          headers: {
-            authorization: `Bearer ${issueToken(eventForOwner.metadata.isAuthorized.owner)}`
-          }
-        });
-
-        assert.that(model.length).is.equalTo(3);
-        assert.that(model[0].initiator).is.equalTo('Jane Doe');
-        assert.that(model[1].initiator).is.equalTo('John Doe');
-        assert.that(model[2].initiator).is.equalTo('Jenny Doe');
+        assert.that(model.length).is.equalTo(0);
       });
     });
 
@@ -958,6 +937,55 @@ suite('integrationTests', function () {
       assert.that(res.text.startsWith('<!doctype html>\n<html>')).is.true();
       assert.that(res.text).is.containing('<title>wolkenkit</title>');
       assert.that(res.text.endsWith('</html>\n')).is.true();
+    });
+  });
+
+  suite('infrastructure recovery', () => {
+    test('exits when the connection to the command bus / event bus is lost.', async function () {
+      this.timeout(25 * 1000);
+
+      shell.exec('docker kill rabbitmq-integration');
+
+      await sleep(1 * 1000);
+
+      await assert.that(async () => {
+        await request.get('http://localhost:3000/v1/ping');
+      }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
+
+      shell.exec('docker start rabbitmq-integration');
+      await waitForRabbitMq({ url: env.RABBITMQ_URL_INTEGRATION });
+    });
+
+    test('exits when the connection to the event store is lost.', async () => {
+      shell.exec('docker kill postgres-integration');
+
+      await sleep(1 * 1000);
+
+      await assert.that(async () => {
+        await request.get('http://localhost:3000/v1/ping');
+      }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
+
+      shell.exec('docker start postgres-integration');
+      await waitForPostgres({ url: env.POSTGRES_URL_INTEGRATION });
+
+      // We need to wait for a few seconds after having started
+      // PostgreSQL, as it (for whatever reason) takes a long time
+      // to actually become available. If we don't do a sleep here,
+      // we run into "the database system is starting up" errors.
+      await sleep(5 * 1000);
+    });
+
+    test('exits when the connection to a list store is lost.', async () => {
+      shell.exec('docker kill mongodb-integration');
+
+      await sleep(1 * 1000);
+
+      await assert.that(async () => {
+        await request.get('http://localhost:3000/v1/ping');
+      }).is.throwingAsync(ex => ex.code === 'ECONNREFUSED');
+
+      shell.exec('docker start mongodb-integration');
+      await waitForMongo({ url: env.MONGO_URL_INTEGRATION });
     });
   });
 });

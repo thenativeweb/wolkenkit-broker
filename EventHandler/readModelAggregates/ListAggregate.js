@@ -1,8 +1,6 @@
 'use strict';
 
 const { Event } = require('commands-events'),
-      isBoolean = require('lodash/isBoolean'),
-      merge = require('lodash/merge'),
       toArray = require('streamtoarray'),
       uuid = require('uuidv4');
 
@@ -55,17 +53,28 @@ class Readable {
 }
 
 class Writable extends Readable {
-  constructor ({ readModel, modelStore, modelName, domainEvent, uncommittedEvents }) {
+  constructor ({
+    readModel,
+    modelStore,
+    modelName,
+    domainEvent,
+    domainEventMetadata,
+    uncommittedEvents
+  }) {
     super({ readModel, modelStore, modelName });
 
     if (!domainEvent) {
       throw new Error('Domain event is missing.');
+    }
+    if (!domainEventMetadata) {
+      throw new Error('Domain event metadata are missing.');
     }
     if (!uncommittedEvents) {
       throw new Error('Uncommitted events are missing.');
     }
 
     this.domainEvent = domainEvent;
+    this.domainEventMetadata = domainEventMetadata;
     this.uncommittedEvents = uncommittedEvents;
   }
 
@@ -81,7 +90,7 @@ class Writable extends Readable {
       this.uncommittedEvents.pop();
     }
 
-    this.uncommittedEvents.push(new Event({
+    const modelEvent = new Event({
       context: { name: this.modelType },
       aggregate: { name: this.modelName, id: uuid.empty() },
       name,
@@ -89,14 +98,19 @@ class Writable extends Readable {
       data,
       metadata: {
         correlationId: this.domainEvent.metadata.correlationId,
-        causationId: this.domainEvent.id,
-        isAuthorized: merge(
-          {},
-          this.domainEvent.metadata.isAuthorized,
-          (data.payload && data.payload.isAuthorized) || {}
-        )
+        causationId: this.domainEvent.id
       }
-    }));
+    });
+
+    modelEvent.addInitiator({ id: this.domainEvent.initiator.id });
+
+    this.uncommittedEvents.push({
+      event: modelEvent,
+      metadata: {
+        domainEvent: this.domainEvent,
+        domainEventMetadata: this.domainEventMetadata
+      }
+    });
   }
 
   add (payload) {
@@ -104,18 +118,12 @@ class Writable extends Readable {
       throw new Error('Payload is missing.');
     }
 
-    Object.keys(this.readModel.fields).forEach(fieldName => {
-      if (!payload[fieldName]) {
-        payload[fieldName] = this.readModel.fields[fieldName].initialState;
-      }
-    });
+    for (const fieldName of Object.keys(this.readModel.fields)) {
+      payload[fieldName] =
+        payload[fieldName] || this.readModel.fields[fieldName].initialState;
+    }
 
     payload.id = payload.id || this.domainEvent.aggregate.id;
-    payload.isAuthorized = merge(
-      {},
-      this.domainEvent.metadata.isAuthorized,
-      payload.isAuthorized || {}
-    );
 
     this.publishEvent('added', { payload });
 
@@ -155,44 +163,6 @@ class Writable extends Readable {
     }
 
     this.publishEvent('updated', { selector: where, payload: set });
-  }
-
-  authorize ({ where, forAuthenticated, forPublic }) {
-    if (!where) {
-      throw new Error('Where is missing.');
-    }
-    if (!isBoolean(forAuthenticated) && !isBoolean(forPublic)) {
-      throw new Error('Invalid authorization options.');
-    }
-
-    const payload = {
-      isAuthorized: {}
-    };
-
-    if (isBoolean(forAuthenticated)) {
-      payload.isAuthorized.forAuthenticated = forAuthenticated;
-    }
-    if (isBoolean(forPublic)) {
-      payload.isAuthorized.forPublic = forPublic;
-    }
-
-    this.publishEvent('updated', { selector: where, payload });
-  }
-
-  transferOwnership ({ where, to }) {
-    if (!where) {
-      throw new Error('Where is missing.');
-    }
-    if (!to) {
-      throw new Error('Owner is missing.');
-    }
-
-    this.publishEvent('updated', {
-      selector: where,
-      payload: {
-        isAuthorized: { owner: to }
-      }
-    });
   }
 
   remove ({ where }) {

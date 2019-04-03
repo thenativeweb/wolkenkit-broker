@@ -452,7 +452,7 @@ suite('EventSequencer', () => {
 
         const strategy = eventSequencer.getStrategyFor(eventStarted);
 
-        assert.that(strategy).is.equalTo({ type: 'proceed' });
+        assert.that(strategy).is.equalTo({ type: 'proceed', forward: true });
       });
 
       test('if the event is the successor of the last processed events of all models.', async () => {
@@ -471,7 +471,7 @@ suite('EventSequencer', () => {
 
         const strategy = eventSequencer.getStrategyFor(eventStarted);
 
-        assert.that(strategy).is.equalTo({ type: 'proceed' });
+        assert.that(strategy).is.equalTo({ type: 'proceed', forward: true });
       });
 
       test('if the event is the successor of the last processed events of at least one model.', async () => {
@@ -490,7 +490,7 @@ suite('EventSequencer', () => {
 
         const strategy = eventSequencer.getStrategyFor(eventStarted);
 
-        assert.that(strategy).is.equalTo({ type: 'proceed' });
+        assert.that(strategy).is.equalTo({ type: 'proceed', forward: true });
       });
     });
   });

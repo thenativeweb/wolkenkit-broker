@@ -92,7 +92,11 @@ const loggerSystem = flaschenpost.getLogger();
         fromPosition,
         toPosition,
         async handleReplayedDomainEvent (replayedDomainEvent) {
-          await eventHandlingStrategies.proceed(replayedDomainEvent, { type: 'proceed', forward: false });
+          await eventHandlingStrategies.proceed({
+            event: replayedDomainEvent,
+            metadata: { state: {}, previousState: {}},
+            strategy: { type: 'proceed', forward: false }
+          });
         }
       });
 

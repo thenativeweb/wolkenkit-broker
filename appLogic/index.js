@@ -1,8 +1,12 @@
 'use strict';
 
-const { PassThrough } = require('stream');
+const { PassThrough, pipeline } = require('stream');
 
-const getEventHandlingStrategies = require('./getEventHandlingStrategies');
+const FilterStream = require('./FilterStream'),
+      getEventHandlingStrategies = require('./getEventHandlingStrategies'),
+      getServicesForReadModelQueries = require('../services/getForReadModelQueries'),
+      getServicesForWriteModelEventPreparation = require('../services/getForWriteModelEventPreparation'),
+      MapStream = require('./MapStream');
 
 const appLogic = function ({
   app,
@@ -49,15 +53,20 @@ const appLogic = function ({
     });
   });
 
-  app.api.read = async function ({ modelType, modelName, user, query: { where, orderBy, skip, take }}) {
+  app.api.read = async function ({
+    modelType,
+    modelName,
+    metadata,
+    query: { where, orderBy, skip, take }
+  }) {
     if (!modelType) {
       throw new Error('Model type is missing.');
     }
     if (!modelName) {
       throw new Error('Model name is missing.');
     }
-    if (!user) {
-      throw new Error('User is missing.');
+    if (!metadata) {
+      throw new Error('Metadata are missing.');
     }
     if (!where) {
       throw new Error('Where is missing.');
@@ -72,41 +81,113 @@ const appLogic = function ({
       throw new Error('Take is missing.');
     }
 
-    const incomingStream = await modelStore.read({
+    const query = { where, orderBy, skip, take };
+    const { queries } = readModel[modelType][modelName];
+
+    const services = getServicesForReadModelQueries({
+      app,
+      metadata,
+      readModel,
+      modelStore,
       modelType,
-      modelName,
-      user,
-      applyTransformations: true,
-      query: { where, orderBy, skip, take }
+      modelName
     });
 
-    // The outgoingStream is the stream that is used to send data to the
-    // client over some push mechanism such as SSE or web sockets.
+    const incomingStream = await modelStore.read({ modelType, modelName, query });
+    const transformStreams = [];
+
+    const { isAuthorized, filter, map } = queries.readItem;
+
+    transformStreams.push(new FilterStream({
+      app,
+      filter: async item => await isAuthorized(item, query, services)
+    }));
+
+    if (filter) {
+      transformStreams.push(new FilterStream({
+        app,
+        filter: async item => await filter(item, query, services)
+      }));
+    }
+
+    if (map) {
+      transformStreams.push(new MapStream({
+        app,
+        map: async item => await map(item, query, services)
+      }));
+    }
+
     const outgoingStream = new PassThrough({ objectMode: true });
 
-    // When the client disconnects actively, we need to stop sending
-    // results, hence we unpipe. This pauses the incomingStream, which
-    // still may have unread data in it. Hence we need to resume it
-    // to make sure that there are no unread data left in memory that
-    // keeps the GC from removing the stream. Additionally, if the
-    // incomingStream is a live stream, there is no one that will ever
-    // call end() on the stream, hence we need to do it here to avoid
-    // the stream to stay open forever.
-    outgoingStream.once('finish', () => {
-      incomingStream.unpipe(outgoingStream);
-      incomingStream.resume();
+    pipeline(incomingStream, ...transformStreams, outgoingStream, () => {
+      // Ignore any errors here, since pipeline cleans up, and we can't deliver
+      // any more data to the client anyway (since the outgoing stream has been
+      // destroyed by pipeline, or it has been closed by the client).
     });
-
-    // Now, start the actual work and pipe the results to the client.
-    incomingStream.pipe(outgoingStream);
 
     return outgoingStream;
   };
 
-  app.api.willPublishEvent = async function ({ event, metadata: { state, previousState, client }}) {
+  app.api.prepareEventForForwarding = async function ({ event, metadata }) {
     if (event.type === 'readModel') {
-      // TODO: isAuthorized für Liste? => readList statt readItem
-      return event;
+      const { domainEvent, domainEventMetadata } = metadata;
+      const { isAuthorized } = writeModel[domainEvent.context.name][domainEvent.aggregate.name].events[domainEvent.name];
+
+      const aggregateInstance = new app.ReadableAggregate({
+        writeModel,
+        context: { name: domainEvent.context.name },
+        aggregate: { name: domainEvent.aggregate.name, id: domainEvent.aggregate.id }
+      });
+
+      aggregateInstance.applySnapshot({
+        revision: domainEvent.metadata.revision,
+        state: domainEventMetadata.state
+      });
+
+      // Additionally, attach the previous state, and do this in the same way as
+      // applySnapshot works.
+      aggregateInstance.api.forReadOnly.previousState = domainEventMetadata.previousState;
+      aggregateInstance.api.forEvents.previousState = domainEventMetadata.previousState;
+
+      const services = getServicesForWriteModelEventPreparation({
+        app,
+        event: domainEvent,
+        metadata,
+        readModel,
+        modelStore
+      });
+
+      let isDomainEventAuthorized;
+
+      try {
+        isDomainEventAuthorized = await isAuthorized(aggregateInstance, domainEvent, services);
+      } catch (ex) {
+        logger.error('Is authorized failed.', {
+          event: domainEvent,
+          metadata: domainEventMetadata,
+          ex
+        });
+        isDomainEventAuthorized = false;
+      }
+
+      if (!isDomainEventAuthorized) {
+        return;
+      }
+
+      // Create a new read model event from the existing one, without the data
+      // section.
+      const filteredReadModelEvent = new app.Event({
+        context: { name: event.context.name },
+        aggregate: { name: event.aggregate.name, id: event.aggregate.id },
+        name: 'updated',
+        type: event.type,
+        metadata: {
+          correlationId: event.metadata.correlationId,
+          causationId: event.metadata.causationId
+        }
+      });
+
+      return filteredReadModelEvent;
     }
 
     const {
@@ -117,35 +198,69 @@ const appLogic = function ({
 
     const aggregateInstance = new app.ReadableAggregate({
       writeModel,
-      content: { name: event.context.name },
+      context: { name: event.context.name },
       aggregate: { name: event.aggregate.name, id: event.aggregate.id }
     });
 
     aggregateInstance.applySnapshot({
       revision: event.metadata.revision,
-      state
+      state: metadata.state
     });
 
     // Additionally, attach the previous state, and do this in the same way as
     // applySnapshot works.
-    aggregateInstance.api.forReadOnly.previousState = previousState;
-    aggregateInstance.api.forEvents.previousState = previousState;
+    aggregateInstance.api.forReadOnly.previousState = metadata.previousState;
+    aggregateInstance.api.forEvents.previousState = metadata.previousState;
+
+    const services = getServicesForWriteModelEventPreparation({
+      app,
+      event,
+      metadata,
+      readModel,
+      modelStore
+    });
+
+    let isDomainEventAuthorized;
 
     try {
-      // TODO: Inject services ...
-      if (!await isAuthorized(aggregateInstance, event, { client })) {
-        return;
-      }
+      isDomainEventAuthorized = await isAuthorized(aggregateInstance, event, services);
     } catch (ex) {
-      // Ignore the exception and return.
-      // TODO: Log
+      logger.error('Is authorized failed.', { event, metadata, ex });
+      isDomainEventAuthorized = false;
+    }
+
+    if (!isDomainEventAuthorized) {
       return;
     }
 
-    // TODO: filter
-    // TODO: map
+    if (filter) {
+      let keepEvent;
 
-    return event;
+      try {
+        keepEvent = await filter(aggregateInstance, event, services);
+      } catch (ex) {
+        logger.error('Filter failed.', { event, metadata, ex });
+        keepEvent = false;
+      }
+
+      if (!keepEvent) {
+        return;
+      }
+    }
+
+    let mappedEvent = event;
+
+    if (map) {
+      try {
+        mappedEvent = await map(aggregateInstance, event, services);
+      } catch (ex) {
+        logger.error('Map failed.', { event, metadata, ex });
+
+        return;
+      }
+    }
+
+    return mappedEvent;
   };
 
   app.api.incoming.on('data', ({ command, metadata }) => {

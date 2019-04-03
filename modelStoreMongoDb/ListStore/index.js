@@ -5,7 +5,6 @@ const { EventEmitter } = require('events'),
 
 const cloneDeep = require('lodash/cloneDeep'),
       find = require('lodash/find'),
-      flatten = require('flat'),
       mongodbUri = require('mongodb-uri'),
       { MongoClient } = require('mongodb'),
       omit = require('lodash/omit'),
@@ -210,19 +209,7 @@ class ListStore extends EventEmitter {
       throw new Error('Payload is missing.');
     }
 
-    let clonedPayload = cloneDeep(payload);
-
-    // For isAuthorized we don't want to replace the existing one with the
-    // updates in the database, but merge it. For this, we need to provide the
-    // flattened path to MongoDB instead of the isAuthorized object.
-    if (clonedPayload.isAuthorized) {
-      const flattenedIsAuthorized = flatten({ isAuthorized: clonedPayload.isAuthorized });
-
-      clonedPayload = omit(clonedPayload, 'isAuthorized');
-      clonedPayload = { ...clonedPayload, ...flattenedIsAuthorized };
-    }
-
-    const translatedPayload = translate.payload(clonedPayload),
+    const translatedPayload = translate.payload(payload),
           translatedSelector = translate.selector(selector);
 
     const result = await this.collections[modelName].updateMany(translatedSelector, translatedPayload);
@@ -242,15 +229,9 @@ class ListStore extends EventEmitter {
     await this.collections[modelName].deleteMany(translatedSelector);
   }
 
-  async read ({ modelName, applyTransformations, user, query }) {
+  async read ({ modelName, query }) {
     if (!modelName) {
       throw new Error('Model name is missing.');
-    }
-    if (applyTransformations === undefined) {
-      throw new Error('Apply transformations is missing.');
-    }
-    if (applyTransformations && !user) {
-      throw new Error('User is missing.');
     }
     if (!query) {
       throw new Error('Query is missing.');
@@ -282,77 +263,8 @@ class ListStore extends EventEmitter {
     }
     cursor = cursor.limit(query.take || 100);
 
-    const databaseResult = cursor.stream({
+    const result = cursor.stream({
       transform: item => omit(item, '_id')
-    });
-
-    if (!applyTransformations) {
-      return databaseResult;
-    }
-
-    const { readModel } = this;
-
-    const transformedResult = new Transform({
-      objectMode: true,
-      transform (item, encoding, callback) {
-        const { queries } = readModel[modelName];
-
-        if (!queries || !queries.readItem) {
-          this.push(item);
-
-          return callback(null);
-        }
-
-        const { isAuthorized, filter, map } = queries.readItem;
-
-        if (isAuthorized) {
-          let keepItem;
-
-          try {
-            keepItem = isAuthorized(item, { ...query, user });
-          } catch (ex) {
-            return callback(ex);
-          }
-
-          if (!keepItem) {
-            return callback(null);
-          }
-        }
-
-        if (filter) {
-          let keepItem;
-
-          try {
-            keepItem = filter(item, { ...query, user });
-          } catch (ex) {
-            return callback(ex);
-          }
-
-          if (!keepItem) {
-            return callback(null);
-          }
-        }
-
-        let transformedItem = item;
-
-        if (map) {
-          try {
-            transformedItem = map(item, { ...query, user });
-          } catch (ex) {
-            return callback(ex);
-          }
-        }
-
-        callback(null, transformedItem);
-      }
-    });
-
-    const result = new PassThrough({ objectMode: true });
-
-    pipeline(databaseResult, transformedResult, result, err => {
-      if (err) {
-        result.emit('error', err);
-      }
     });
 
     return result;

@@ -94,7 +94,7 @@ class EventSequencer {
     const missingEvents = domainEvent.metadata.position - (lastProcessedPosition + 1);
 
     if (missingEvents === 0) {
-      return { type: 'proceed' };
+      return { type: 'proceed', forward: true };
     } else if (missingEvents < 0) {
       return { type: 'skip' };
     } else if (missingEvents > 0) {

@@ -2,7 +2,14 @@
 
 const ListAggregate = require('./ListAggregate');
 
-const create = function ({ readModel, modelStore, modelType, modelName, domainEvent }) {
+const create = function ({
+  readModel,
+  modelStore,
+  modelType,
+  modelName,
+  domainEvent,
+  domainEventMetadata
+}) {
   if (!readModel) {
     throw new Error('Read model is missing.');
   }
@@ -15,6 +22,12 @@ const create = function ({ readModel, modelStore, modelType, modelName, domainEv
   if (!modelName) {
     throw new Error('Model name is missing.');
   }
+  if (domainEvent && !domainEventMetadata) {
+    throw new Error('Domain event metadata are missing.');
+  }
+  if (!domainEvent && domainEventMetadata) {
+    throw new Error('Domain event is missing.');
+  }
 
   switch (modelType) {
     case 'lists': {
@@ -24,6 +37,7 @@ const create = function ({ readModel, modelStore, modelType, modelName, domainEv
           modelStore,
           modelName,
           domainEvent,
+          domainEventMetadata,
           uncommittedEvents: []
         });
       }

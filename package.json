@@ -22,7 +22,7 @@
   ],
   "dependencies": {
     "async-retry": "1.2.3",
-    "commands-events": "thenativeweb/commands-events#313ce3cd1d978fee16c6217d8b1e1c6564d2b99b",
+    "commands-events": "thenativeweb/commands-events#cc950a242a8cb9a4407ba98587122ef0f78a4d13",
     "flaschenpost": "1.1.3",
     "flat": "4.1.0",
     "get-cors-origin": "1.0.0",
@@ -32,10 +32,10 @@
     "processenv": "1.1.0",
     "sha1": "1.1.1",
     "streamtoarray": "1.1.0",
-    "tailwind": "thenativeweb/tailwind#544a1660cb1a0f69e98ef09b2f70e0b63dbc910d",
-    "uuidv4": "3.0.1",
+    "tailwind": "thenativeweb/tailwind#24c3141524c3c65044a6113012c92ae25f8447d1",
+    "uuidv4": "4.0.0",
     "wolkenkit-api-shell": "1.1.1",
-    "wolkenkit-application": "thenativeweb/wolkenkit-application#e595ba1423002de2e8e5a077c3a735473423745f",
+    "wolkenkit-application": "thenativeweb/wolkenkit-application#2b88335aa4000f68c6ee17b4d519aeef26ad89be",
     "wolkenkit-eventstore": "thenativeweb/wolkenkit-eventstore#c921bfabcf570ad5c225166e90d1f88534f45b7b"
   },
   "devDependencies": {
@@ -51,7 +51,8 @@
     "roboter": "4.0.3",
     "runfork": "1.1.0",
     "shelljs": "0.8.3",
-    "superagent": "5.0.2"
+    "superagent": "5.0.2",
+    "wolkenkit-application-tools": "github:thenativeweb/wolkenkit-application-tools#5fd454b67290fc739cb6446f54e69cde99f0b0cf"
   },
   "scripts": {
     "build": "docker build -t thenativeweb/wolkenkit-broker ."

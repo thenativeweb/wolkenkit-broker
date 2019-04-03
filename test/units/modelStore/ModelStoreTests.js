@@ -227,10 +227,22 @@ suite('ModelStore', () => {
       });
 
       const modelEvents = [
-        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
-        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
-        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
-        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }})
+        {
+          event: buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
+          metadata: { domainEvent }
+        },
+        {
+          event: buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
+          metadata: { domainEvent }
+        },
+        {
+          event: buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
+          metadata: { domainEvent }
+        },
+        {
+          event: buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }}),
+          metadata: { domainEvent }
+        }
       ];
 
       await modelStore.processEvents(domainEvent, modelEvents);
@@ -251,8 +263,8 @@ suite('ModelStore', () => {
         async initialize () {
           eventSequencer.registerModel({ type: 'lists', name: 'peerGroups', lastProcessedPosition: 0 });
         },
-        async added (options) {
-          this.items.push(options.payload);
+        async added ({ payload }) {
+          this.items.push(payload);
         },
         async updatePosition () {
           // Intentionally left blank.
@@ -270,10 +282,22 @@ suite('ModelStore', () => {
       });
 
       const modelEvents = [
-        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
-        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
-        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
-        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }})
+        {
+          event: buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
+          metadata: { domainEvent }
+        },
+        {
+          event: buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
+          metadata: { domainEvent }
+        },
+        {
+          event: buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
+          metadata: { domainEvent }
+        },
+        {
+          event: buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }}),
+          metadata: { domainEvent }
+        }
       ];
 
       await modelStore.processEvents(domainEvent, modelEvents);
@@ -291,8 +315,8 @@ suite('ModelStore', () => {
           eventSequencer.registerModel({ type: 'lists', name: 'peerGroups', lastProcessedPosition: 0 });
           eventSequencer.registerModel({ type: 'lists', name: 'tasteMakers', lastProcessedPosition: 1 });
         },
-        async added (options) {
-          this.items.push(options.modelName);
+        async added ({ modelName }) {
+          this.items.push(modelName);
         },
         async updatePosition () {
           // Intentionally left blank.
@@ -310,8 +334,14 @@ suite('ModelStore', () => {
       });
 
       const modelEvents = [
-        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
-        buildModelEvent('lists', 'tasteMakers', 'added', { payload: { value: 1 }})
+        {
+          event: buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
+          metadata: { domainEvent }
+        },
+        {
+          event: buildModelEvent('lists', 'tasteMakers', 'added', { payload: { value: 1 }}),
+          metadata: { domainEvent }
+        }
       ];
 
       await modelStore.processEvents(domainEvent, modelEvents);
@@ -326,8 +356,8 @@ suite('ModelStore', () => {
         async initialize () {
           eventSequencer.registerModel({ type: 'lists', name: 'peerGroups', lastProcessedPosition: 0 });
         },
-        async added (options) {
-          this.items.push(options.payload);
+        async added ({ payload }) {
+          this.items.push(payload);
         },
         async updatePosition () {
           // Intentionally left blank.
@@ -358,10 +388,22 @@ suite('ModelStore', () => {
       });
 
       const modelEvents = [
-        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
-        buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
-        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
-        buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }})
+        {
+          event: buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 1 }}),
+          metadata: { domainEvent }
+        },
+        {
+          event: buildModelEvent('lists', 'peerGroups', 'added', { payload: { value: 2 }}),
+          metadata: { domainEvent }
+        },
+        {
+          event: buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 3 }}),
+          metadata: { domainEvent }
+        },
+        {
+          event: buildModelEvent('trees', 'peerGroups', 'added', { payload: { value: 4 }}),
+          metadata: { domainEvent }
+        }
       ];
 
       await assert.that(async () => {
@@ -427,8 +469,6 @@ suite('ModelStore', () => {
       assert.that(peerGroups).is.equalTo('this should be a stream');
       assert.that(listStore.options).is.equalTo({
         modelName: 'peerGroups',
-        applyTransformations: false,
-        user: undefined,
         query: {
           where: { foo: 'bar' }
         }
@@ -562,8 +602,6 @@ suite('ModelStore', () => {
       assert.that(item).is.equalTo('this should be an item');
       assert.that(listStore.options).is.equalTo({
         modelName: 'peerGroups',
-        applyTransformations: false,
-        user: undefined,
         query: {
           where: { foo: 'bar' },
           take: 1

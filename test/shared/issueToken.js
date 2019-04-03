@@ -17,10 +17,12 @@ const limes = new Limes({
   ]
 });
 
-module.exports = function (subject, payload) {
+const issueToken = function (subject, payload) {
   return limes.issueToken({
     issuer: 'https://auth.thenativeweb.io',
     subject,
     payload
   });
 };
+
+module.exports = issueToken;

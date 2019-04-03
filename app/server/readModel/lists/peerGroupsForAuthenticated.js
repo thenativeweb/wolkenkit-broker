@@ -1,6 +1,6 @@
 'use strict';
 
-const { forPublic } = require('wolkenkit-application-tools');
+const { forAuthenticated } = require('wolkenkit-application-tools');
 
 const fields = {
   initiator: { initialState: '', fastLookup: true, isUnique: false },
@@ -15,30 +15,12 @@ const projections = {
       destination: event.data.destination,
       participants: fields.participants.initialState
     });
-  },
-
-  'planning.peerGroup.joined' (peerGroups, event) {
-    peerGroups.update({
-      where: { id: event.aggregate.id },
-      set: {
-        participants: { $add: event.data.participant }
-      }
-    });
-  },
-
-  'planning.peerGroup.left' (peerGroups, event) {
-    peerGroups.update({
-      where: { id: event.aggregate.id },
-      set: {
-        participants: { $remove: event.data.participant }
-      }
-    });
   }
 };
 
 const queries = {
   readItem: {
-    isAuthorized: forPublic()
+    isAuthorized: forAuthenticated()
   }
 };
 
