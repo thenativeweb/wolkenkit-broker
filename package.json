@@ -22,7 +22,7 @@
   ],
   "dependencies": {
     "async-retry": "1.2.3",
-    "commands-events": "thenativeweb/commands-events#cc950a242a8cb9a4407ba98587122ef0f78a4d13",
+    "commands-events": "thenativeweb/commands-events#ca11473cfb1de65d65d0342540e33e7acfa4dc78",
     "flaschenpost": "1.1.3",
     "flat": "4.1.0",
     "get-cors-origin": "1.0.0",
@@ -32,11 +32,11 @@
     "processenv": "1.1.0",
     "sha1": "1.1.1",
     "streamtoarray": "1.1.0",
-    "tailwind": "thenativeweb/tailwind#24c3141524c3c65044a6113012c92ae25f8447d1",
+    "tailwind": "thenativeweb/tailwind#bd3541d822ae786319da464f3e68a3a1068b1b88",
     "uuidv4": "4.0.0",
     "wolkenkit-api-shell": "1.1.1",
     "wolkenkit-application": "thenativeweb/wolkenkit-application#2b88335aa4000f68c6ee17b4d519aeef26ad89be",
-    "wolkenkit-eventstore": "thenativeweb/wolkenkit-eventstore#c921bfabcf570ad5c225166e90d1f88534f45b7b"
+    "wolkenkit-eventstore": "thenativeweb/wolkenkit-eventstore#b1f29a2ba6c614f26c8bf721397e3446968bd2d8"
   },
   "devDependencies": {
     "amqplib": "0.5.3",

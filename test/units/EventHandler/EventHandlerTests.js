@@ -106,7 +106,7 @@ suite('EventHandler', () => {
         metadata: { state: {}, previousState: {}}
       });
 
-      assert.that(uncommittedEvents.length).is.equalTo(3);
+      assert.that(uncommittedEvents.length).is.equalTo(5);
 
       assert.that(uncommittedEvents[0].event.context.name).is.equalTo('lists');
       assert.that(uncommittedEvents[0].event.aggregate.name).is.equalTo('peerGroups');
@@ -137,11 +137,39 @@ suite('EventHandler', () => {
       });
 
       assert.that(uncommittedEvents[2].event.context.name).is.equalTo('lists');
-      assert.that(uncommittedEvents[2].event.aggregate.name).is.equalTo('tasteMakers');
+      assert.that(uncommittedEvents[2].event.aggregate.name).is.equalTo('peerGroupsWithFilter');
       assert.that(uncommittedEvents[2].event.name).is.equalTo('added');
       assert.that(uncommittedEvents[2].event.type).is.equalTo('readModel');
       assert.that(uncommittedEvents[2].event.initiator.id).is.equalTo(users.jane.id);
       assert.that(uncommittedEvents[2].event.data).is.equalTo({
+        payload: {
+          id: peerGroupStartedEvent.aggregate.id,
+          initiator: peerGroupStartedEvent.data.initiator,
+          destination: peerGroupStartedEvent.data.destination,
+          participants: []
+        }
+      });
+
+      assert.that(uncommittedEvents[3].event.context.name).is.equalTo('lists');
+      assert.that(uncommittedEvents[3].event.aggregate.name).is.equalTo('peerGroupsWithMap');
+      assert.that(uncommittedEvents[3].event.name).is.equalTo('added');
+      assert.that(uncommittedEvents[3].event.type).is.equalTo('readModel');
+      assert.that(uncommittedEvents[3].event.initiator.id).is.equalTo(users.jane.id);
+      assert.that(uncommittedEvents[3].event.data).is.equalTo({
+        payload: {
+          id: peerGroupStartedEvent.aggregate.id,
+          initiator: peerGroupStartedEvent.data.initiator,
+          destination: peerGroupStartedEvent.data.destination,
+          participants: []
+        }
+      });
+
+      assert.that(uncommittedEvents[4].event.context.name).is.equalTo('lists');
+      assert.that(uncommittedEvents[4].event.aggregate.name).is.equalTo('tasteMakers');
+      assert.that(uncommittedEvents[4].event.name).is.equalTo('added');
+      assert.that(uncommittedEvents[4].event.type).is.equalTo('readModel');
+      assert.that(uncommittedEvents[4].event.initiator.id).is.equalTo(users.jane.id);
+      assert.that(uncommittedEvents[4].event.data).is.equalTo({
         payload: {
           id: peerGroupStartedEvent.aggregate.id,
           name: peerGroupStartedEvent.data.initiator,

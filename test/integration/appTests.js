@@ -37,16 +37,24 @@ api.sendCommand = async function (command) {
 };
 
 api.subscribeToEvents = async function ({
+  user,
   onConnect = noop,
   onData,
   onError = noop
 }) {
+  const headers = {};
+
+  if (user) {
+    headers.authorization = `Bearer ${issueToken(user.id)}`;
+  }
+
   const server = await jsonLinesClient({
     protocol: 'http',
     host: 'localhost',
     port: 3000,
     path: '/v1/events',
-    body: {}
+    body: {},
+    headers
   });
 
   process.nextTick(async () => await onConnect());
@@ -302,17 +310,114 @@ suite('integrationTests', function () {
                   }
                   case 2: {
                     assert.that(receivedEvent.type).is.equalTo('readModel');
-                    assert.that(receivedEvent.aggregate.name).is.equalTo('peerGroups');
                     break;
                   }
                   case 3: {
                     assert.that(receivedEvent.type).is.equalTo('readModel');
-                    assert.that(receivedEvent.aggregate.name).is.equalTo('peerGroupsForAuthenticated');
                     break;
                   }
                   case 4: {
                     assert.that(receivedEvent.type).is.equalTo('readModel');
-                    assert.that(receivedEvent.aggregate.name).is.equalTo('tasteMakers');
+                    await unsubscribe();
+                    resolve();
+                    break;
+                  }
+                  default: {
+                    reject(new Error('Invalid operation.'));
+                  }
+                }
+              } catch (ex) {
+                reject(ex);
+              }
+            },
+            async onError (err) {
+              reject(err);
+            }
+          });
+        } catch (ex) {
+          reject(ex);
+        }
+      });
+    });
+
+    test(`downplays read model events by removing their data and marking them as 'updated'.`, async () => {
+      const event = buildEvent('planning', 'peerGroup', 'started', {
+        initiator: 'John Doe',
+        destination: 'Somewhere over the rainbow'
+      });
+
+      event.addInitiator(users.jane);
+
+      let counter = 0;
+
+      await new Promise(async (resolve, reject) => {
+        try {
+          await api.subscribeToEvents({
+            async onConnect () {
+              eventbus.write({ event, metadata: { state: {}, previousState: {}}});
+            },
+            async onData (receivedEvent, unsubscribe) {
+              try {
+                counter += 1;
+
+                switch (counter) {
+                  case 1: {
+                    assert.that(receivedEvent.type).is.equalTo('domain');
+                    break;
+                  }
+                  case 2: {
+                    assert.that(receivedEvent).is.atLeast({
+                      context: { name: 'lists' },
+                      aggregate: { name: 'peerGroups', id: '00000000-0000-0000-0000-000000000000' },
+                      name: 'updated',
+                      type: 'readModel',
+                      initiator: { id: users.jane.id }
+                    });
+                    assert.that(receivedEvent.data).is.equalTo({});
+                    break;
+                  }
+                  case 3: {
+                    assert.that(receivedEvent).is.atLeast({
+                      context: { name: 'lists' },
+                      aggregate: { name: 'peerGroupsForAuthenticated', id: '00000000-0000-0000-0000-000000000000' },
+                      name: 'updated',
+                      type: 'readModel',
+                      initiator: { id: users.jane.id }
+                    });
+                    assert.that(receivedEvent.data).is.equalTo({});
+                    break;
+                  }
+                  case 4: {
+                    assert.that(receivedEvent).is.atLeast({
+                      context: { name: 'lists' },
+                      aggregate: { name: 'peerGroupsWithFilter', id: '00000000-0000-0000-0000-000000000000' },
+                      name: 'updated',
+                      type: 'readModel',
+                      initiator: { id: users.jane.id }
+                    });
+                    assert.that(receivedEvent.data).is.equalTo({});
+                    break;
+                  }
+                  case 5: {
+                    assert.that(receivedEvent).is.atLeast({
+                      context: { name: 'lists' },
+                      aggregate: { name: 'peerGroupsWithMap', id: '00000000-0000-0000-0000-000000000000' },
+                      name: 'updated',
+                      type: 'readModel',
+                      initiator: { id: users.jane.id }
+                    });
+                    assert.that(receivedEvent.data).is.equalTo({});
+                    break;
+                  }
+                  case 6: {
+                    assert.that(receivedEvent).is.atLeast({
+                      context: { name: 'lists' },
+                      aggregate: { name: 'tasteMakers', id: '00000000-0000-0000-0000-000000000000' },
+                      name: 'updated',
+                      type: 'readModel',
+                      initiator: { id: users.jane.id }
+                    });
+                    assert.that(receivedEvent.data).is.equalTo({});
                     await unsubscribe();
                     resolve();
                     break;
@@ -716,6 +821,145 @@ suite('integrationTests', function () {
       assert.that(model[0].destination).is.equalTo('Somewhere over the rainbow');
       assert.that(model[0].participants).is.equalTo([ 'Jane Doe', 'Jenny Doe', 'Jim Doe' ]);
     });
+
+    suite('map', () => {
+      test('maps events (in this example, for anonymous users).', async () => {
+        const event = buildEvent('planning', 'peerGroup', 'startedWithMap', {
+          initiator: 'John Doe',
+          destination: 'Somewhere over the rainbow'
+        });
+
+        event.addInitiator(users.jane);
+
+        await new Promise(async (resolve, reject) => {
+          try {
+            await api.subscribeToEvents({
+              async onConnect () {
+                eventbus.write({ event, metadata: { state: {}, previousState: {}}});
+              },
+              async onData (receivedEvent, unsubscribe) {
+                unsubscribe();
+                assert.that(receivedEvent.name).is.equalTo('startedWithMap');
+                assert.that(receivedEvent.data.initiator).is.undefined();
+                assert.that(receivedEvent.data.destination).is.equalTo('Somewhere over the rainbow');
+                resolve();
+              },
+              async onError (err) {
+                reject(err);
+              }
+            });
+          } catch (ex) {
+            reject(ex);
+          }
+        });
+      });
+
+      test('does not map events (in this example, for authenticated users).', async () => {
+        const event = buildEvent('planning', 'peerGroup', 'startedWithMap', {
+          initiator: 'John Doe',
+          destination: 'Somewhere over the rainbow'
+        });
+
+        event.addInitiator(users.jane);
+
+        await new Promise(async (resolve, reject) => {
+          try {
+            await api.subscribeToEvents({
+              user: users.jane,
+              async onConnect () {
+                eventbus.write({ event, metadata: { state: {}, previousState: {}}});
+              },
+              async onData (receivedEvent, unsubscribe) {
+                unsubscribe();
+                assert.that(receivedEvent.name).is.equalTo('startedWithMap');
+                assert.that(receivedEvent.data.initiator).is.equalTo('John Doe');
+                assert.that(receivedEvent.data.destination).is.equalTo('Somewhere over the rainbow');
+                resolve();
+              },
+              async onError (err) {
+                reject(err);
+              }
+            });
+          } catch (ex) {
+            reject(ex);
+          }
+        });
+      });
+    });
+
+    suite('filter', () => {
+      test('filters events (in this example, for anonymous users).', async () => {
+        const eventWithBadWord = buildEvent('planning', 'peerGroup', 'startedWithFilter', {
+          initiator: 'John Doe',
+          destination: 'This destination contains a bad-word.'
+        });
+        const eventWithoutBadWord = buildEvent('planning', 'peerGroup', 'startedWithFilter', {
+          initiator: 'John Doe',
+          destination: 'This destination contains only happy words.'
+        });
+
+        eventWithBadWord.metadata.position = 1;
+        eventWithoutBadWord.metadata.position = 2;
+
+        eventWithBadWord.addInitiator(users.jane);
+        eventWithoutBadWord.addInitiator(users.jane);
+
+        await new Promise(async (resolve, reject) => {
+          try {
+            await api.subscribeToEvents({
+              async onConnect () {
+                eventbus.write({ event: eventWithBadWord, metadata: { state: {}, previousState: {}}});
+                eventbus.write({ event: eventWithoutBadWord, metadata: { state: {}, previousState: {}}});
+              },
+              async onData (receivedEvent, unsubscribe) {
+                unsubscribe();
+                assert.that(receivedEvent.name).is.equalTo('startedWithFilter');
+                assert.that(receivedEvent.data.initiator).is.equalTo('John Doe');
+                assert.that(receivedEvent.data.destination).is.equalTo('This destination contains only happy words.');
+                resolve();
+              },
+              async onError (err) {
+                reject(err);
+              }
+            });
+          } catch (ex) {
+            reject(ex);
+          }
+        });
+      });
+
+      test('does not filter events (in this example, for authenticated users).', async () => {
+        const event = buildEvent('planning', 'peerGroup', 'startedWithFilter', {
+          initiator: 'John Doe',
+          destination: 'This destination contains a bad-word.'
+        });
+
+        event.addInitiator(users.jane);
+
+        await new Promise(async (resolve, reject) => {
+          try {
+            await api.subscribeToEvents({
+              user: users.jane,
+              async onConnect () {
+                eventbus.write({ event, metadata: { state: {}, previousState: {}}});
+              },
+              async onData (receivedEvent, unsubscribe) {
+                unsubscribe();
+                assert.that(receivedEvent.name).is.equalTo('startedWithFilter');
+                assert.that(receivedEvent.data.initiator).is.equalTo('John Doe');
+                assert.that(receivedEvent.data.destination).is.equalTo('This destination contains a bad-word.');
+                resolve();
+              },
+              async onError (err) {
+                reject(err);
+              }
+            });
+          } catch (ex) {
+            reject(ex);
+          }
+        });
+      });
+    });
   });
 
   suite('models', () => {
@@ -868,6 +1112,97 @@ suite('integrationTests', function () {
         const res = await request.get('http://localhost:3000/v1/ping');
 
         assert.that(res.statusCode).is.equalTo(200);
+      });
+
+      suite('map', () => {
+        test('maps items (in this example, for anonymous users).', async () => {
+          const model = await api.readModel({
+            modelType: 'lists',
+            modelName: 'peerGroupsWithMap'
+          });
+
+          assert.that(model.length).is.equalTo(2);
+          assert.that(model[0].initiator).is.undefined();
+          assert.that(model[0].destination).is.equalTo('Somewhere over the rainbow');
+          assert.that(model[0].participants).is.undefined();
+          assert.that(model[1].initiator).is.undefined();
+          assert.that(model[1].destination).is.equalTo('Land of Oz');
+          assert.that(model[1].participants).is.undefined();
+        });
+
+        test('does not map items (in this example, for authenticated users).', async () => {
+          const model = await api.readModel({
+            modelType: 'lists',
+            modelName: 'peerGroupsWithMap',
+            headers: {
+              authorization: `Bearer ${issueToken('jane.doe')}`
+            }
+          });
+
+          assert.that(model.length).is.equalTo(2);
+          assert.that(model[0].initiator).is.equalTo('John Doe');
+          assert.that(model[0].destination).is.equalTo('Somewhere over the rainbow');
+          assert.that(model[0].participants).is.equalTo([]);
+          assert.that(model[1].initiator).is.equalTo('Jane Doe');
+          assert.that(model[1].destination).is.equalTo('Land of Oz');
+          assert.that(model[1].participants).is.equalTo([]);
+        });
+      });
+
+      suite('filter', () => {
+        setup(async () => {
+          const startedWithBadWord = buildEvent('planning', 'peerGroup', 'started', {
+            initiator: 'Jane Doe',
+            destination: 'This destination contains a bad-word.'
+          });
+
+          startedWithBadWord.metadata.position = 3;
+
+          startedWithBadWord.addInitiator(users.jane);
+
+          eventbus.write({
+            event: startedWithBadWord,
+            metadata: { state: {}, previousState: {}}
+          });
+
+          await sleep(0.1 * 1000);
+        });
+
+        test('filters items (in this example, for anonymous users).', async () => {
+          const model = await api.readModel({
+            modelType: 'lists',
+            modelName: 'peerGroupsWithFilter'
+          });
+
+          assert.that(model.length).is.equalTo(2);
+          assert.that(model[0].initiator).is.equalTo('John Doe');
+          assert.that(model[0].destination).is.equalTo('Somewhere over the rainbow');
+          assert.that(model[0].participants).is.equalTo([]);
+          assert.that(model[1].initiator).is.equalTo('Jane Doe');
+          assert.that(model[1].destination).is.equalTo('Land of Oz');
+          assert.that(model[1].participants).is.equalTo([]);
+        });
+
+        test('does not filter items (in this example, for authenticated users).', async () => {
+          const model = await api.readModel({
+            modelType: 'lists',
+            modelName: 'peerGroupsWithFilter',
+            headers: {
+              authorization: `Bearer ${issueToken('jane.doe')}`
+            }
+          });
+
+          assert.that(model.length).is.equalTo(3);
+          assert.that(model[0].initiator).is.equalTo('John Doe');
+          assert.that(model[0].destination).is.equalTo('Somewhere over the rainbow');
+          assert.that(model[0].participants).is.equalTo([]);
+          assert.that(model[1].initiator).is.equalTo('Jane Doe');
+          assert.that(model[1].destination).is.equalTo('Land of Oz');
+          assert.that(model[1].participants).is.equalTo([]);
+          assert.that(model[2].initiator).is.equalTo('Jane Doe');
+          assert.that(model[2].destination).is.equalTo('This destination contains a bad-word.');
+          assert.that(model[2].participants).is.equalTo([]);
+        });
       });
     });
 

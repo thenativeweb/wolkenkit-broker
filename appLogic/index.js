@@ -160,7 +160,7 @@ const appLogic = function ({
       let isDomainEventAuthorized;
 
       try {
-        isDomainEventAuthorized = await isAuthorized(aggregateInstance, domainEvent, services);
+        isDomainEventAuthorized = await isAuthorized(aggregateInstance.api.forReadOnly, domainEvent, services);
       } catch (ex) {
         logger.error('Is authorized failed.', {
           event: domainEvent,
@@ -186,6 +186,8 @@ const appLogic = function ({
           causationId: event.metadata.causationId
         }
       });
+
+      filteredReadModelEvent.addInitiator({ id: event.initiator.id });
 
       return filteredReadModelEvent;
     }
@@ -223,7 +225,7 @@ const appLogic = function ({
     let isDomainEventAuthorized;
 
     try {
-      isDomainEventAuthorized = await isAuthorized(aggregateInstance, event, services);
+      isDomainEventAuthorized = await isAuthorized(aggregateInstance.api.forReadOnly, event, services);
     } catch (ex) {
       logger.error('Is authorized failed.', { event, metadata, ex });
       isDomainEventAuthorized = false;
@@ -237,7 +239,7 @@ const appLogic = function ({
       let keepEvent;
 
       try {
-        keepEvent = await filter(aggregateInstance, event, services);
+        keepEvent = await filter(aggregateInstance.api.forReadOnly, event, services);
       } catch (ex) {
         logger.error('Filter failed.', { event, metadata, ex });
         keepEvent = false;
@@ -252,7 +254,7 @@ const appLogic = function ({
 
     if (map) {
       try {
-        mappedEvent = await map(aggregateInstance, event, services);
+        mappedEvent = await map(aggregateInstance.api.forReadOnly, event, services);
       } catch (ex) {
         logger.error('Map failed.', { event, metadata, ex });
 
