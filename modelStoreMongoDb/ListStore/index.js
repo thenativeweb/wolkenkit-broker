@@ -1,7 +1,6 @@
 'use strict';
 
-const { EventEmitter } = require('events'),
-      { PassThrough, pipeline, Transform } = require('stream');
+const { EventEmitter } = require('events');
 
 const cloneDeep = require('lodash/cloneDeep'),
       find = require('lodash/find'),
@@ -263,8 +262,10 @@ class ListStore extends EventEmitter {
     }
     cursor = cursor.limit(query.take || 100);
 
-    const result = cursor.stream({
-      transform: item => omit(item, '_id')
+    const result = cursor.transformStream({
+      transform (item) {
+        return omit(item, '_id');
+      }
     });
 
     return result;

@@ -708,41 +708,6 @@ const lists = function (options) {
 
           assert.that(items.length).is.equalTo(0);
         });
-
-        suite('queries', () => {
-          const peerGroupByJane = { id: uuid(), initiator: 'Jane Doe', destination: 'Riva', participants: []},
-                peerGroupByJohn = { id: uuid(), initiator: 'John Doe', destination: 'Riva', participants: [ 'John Doe', 'Jane Doe' ]};
-
-          const setupQueries = async function ({ queries }) {
-            const readModel = {
-              lists: {
-                [modelName]: {
-                  fields: {
-                    initiator: { initialState: '', fastLookup: true, isUnique: false },
-                    destination: { initialState: '', fastLookup: true },
-                    participants: { initialState: []},
-                    stars: { initialState: 0 }
-                  }
-                }
-              }
-            };
-
-            if (queries) {
-              readModel.lists[modelName].queries = queries;
-            }
-
-            const initializedReadModel = await initializeReadModel({ readModel });
-
-            eventSequencer = initializedReadModel.eventSequencer;
-            listStore = initializedReadModel.listStore;
-            modelStore = initializedReadModel.modelStore;
-          };
-
-          const addItemsToList = async function () {
-            await listStore.added({ modelName, payload: peerGroupByJane });
-            await listStore.added({ modelName, payload: peerGroupByJohn });
-          };
-        });
       });
     });
 

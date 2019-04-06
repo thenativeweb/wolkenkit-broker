@@ -27,7 +27,7 @@
     "flat": "4.1.0",
     "get-cors-origin": "1.0.0",
     "lodash": "4.17.11",
-    "mongodb": "3.1.6",
+    "mongodb": "3.2.3",
     "mongodb-uri": "0.9.7",
     "processenv": "1.1.0",
     "sha1": "1.1.1",
@@ -36,7 +36,7 @@
     "uuidv4": "4.0.0",
     "wolkenkit-api-shell": "1.1.1",
     "wolkenkit-application": "thenativeweb/wolkenkit-application#2b88335aa4000f68c6ee17b4d519aeef26ad89be",
-    "wolkenkit-eventstore": "thenativeweb/wolkenkit-eventstore#b1f29a2ba6c614f26c8bf721397e3446968bd2d8"
+    "wolkenkit-eventstore": "thenativeweb/wolkenkit-eventstore#0f573e5532e6e419abd2f6bdbd6735df84228f9c"
   },
   "devDependencies": {
     "amqplib": "0.5.3",
@@ -45,7 +45,7 @@
     "hase": "2.0.0",
     "json-lines-client": "1.0.1",
     "limes": "2.0.0",
-    "pg": "7.4.3",
+    "pg": "7.9.0",
     "pg-connection-string": "2.0.0",
     "record-stdstreams": "1.0.0",
     "roboter": "4.0.3",
