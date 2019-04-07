@@ -32,7 +32,7 @@
     "processenv": "1.1.0",
     "sha1": "1.1.1",
     "streamtoarray": "1.1.0",
-    "tailwind": "thenativeweb/tailwind#e9f7b3ee2dbe4280fd10dcb07e695f5773a70402",
+    "tailwind": "thenativeweb/tailwind#09c898314c417da68c73ed317cb4fabd78279622",
     "uuidv4": "4.0.0",
     "wolkenkit-api-shell": "1.1.1",
     "wolkenkit-application": "thenativeweb/wolkenkit-application#2b88335aa4000f68c6ee17b4d519aeef26ad89be",
