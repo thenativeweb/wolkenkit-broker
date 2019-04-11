@@ -35,7 +35,7 @@
     "tailwind": "thenativeweb/tailwind#dc7f5b2e2bfe824a944b32c0176be639feffab37",
     "uuidv4": "4.0.0",
     "wolkenkit-api-shell": "1.1.1",
-    "wolkenkit-application": "thenativeweb/wolkenkit-application#f78bec3b9031f40b75ed4d32b8ee05f30aa63d28",
+    "wolkenkit-application": "thenativeweb/wolkenkit-application#0e450ddc06c9108101134ec7e1de934edc123fef",
     "wolkenkit-eventstore": "thenativeweb/wolkenkit-eventstore#0f573e5532e6e419abd2f6bdbd6735df84228f9c"
   },
   "devDependencies": {
