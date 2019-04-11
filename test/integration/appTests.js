@@ -1302,6 +1302,7 @@ suite('integrationTests', function () {
 
       shell.exec('docker start postgres-integration');
       await waitForPostgres({ url: env.POSTGRES_URL_INTEGRATION });
+      await eventStore.initialize({ url: env.POSTGRES_URL_INTEGRATION, namespace });
 
       // We need to wait for a few seconds after having started
       // PostgreSQL, as it (for whatever reason) takes a long time
